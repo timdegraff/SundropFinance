@@ -152,20 +152,31 @@ export default function App() {
   };
 
   // --- Handlers for Smart Tables ---
-  const handleLineItemUpdate = (type: 'revenue' | 'budget', id: string, field: 'modifierPercent' | 'modifierFixed' | 'finalValue', value: number) => {
+  const handleLineItemUpdate = (type: 'revenue' | 'budget', id: string, field: 'modifierPercent' | 'modifierFixed' | 'finalValue' | 'baseline', value: number) => {
     setState(prev => {
         const list = type === 'revenue' ? prev.revenueItems : prev.budgetItems;
         const updatedList = list.map(item => {
             if (item.id !== id) return item;
             
+            // Handle Baseline Update
+            if (field === 'baseline') {
+                return { ...item, baseline: value };
+            }
+
             // Logic for "Final Value" direct edit
             if (field === 'finalValue') {
                 const delta = value - item.baseline;
                 const newPercent = item.baseline > 0 ? (delta / item.baseline) * 100 : 0;
+                // When we set via Final Value (or Dollar Delta), we wipe out any fixed mod and rely on percent.
                 return { ...item, modifierPercent: newPercent, modifierFixed: 0 };
             }
 
-            // Logic for Percent/Fixed edit
+            // Logic for Percent edit: Zero out Fixed to ensure clean % calculation
+            if (field === 'modifierPercent') {
+                return { ...item, modifierPercent: value, modifierFixed: 0 };
+            }
+
+            // Logic for Fixed edit (Legacy/Fallback, though UI now uses FinalValue path for Delta)
             return { ...item, [field]: value };
         });
 
@@ -299,15 +310,6 @@ export default function App() {
                  <button className="px-2 py-1 text-[10px] font-bold bg-slate-800 text-slate-500 rounded cursor-not-allowed opacity-50" title="Coming Soon">PDF</button>
                  <button className="px-2 py-1 text-[10px] font-bold bg-slate-800 text-slate-500 rounded cursor-not-allowed opacity-50" title="Coming Soon">CSV</button>
              </div>
-
-             <button 
-                onClick={handleSave}
-                disabled={isSaving}
-                className={`p-2 rounded-full transition-colors ${isOffline ? 'text-slate-600 cursor-not-allowed' : 'hover:bg-slate-800 text-slate-400 hover:text-amber-500'}`}
-                title={isOffline ? "Saving disabled in Offline Mode" : "Save to Cloud"}
-            >
-                 <SaveIcon className={isSaving ? "animate-pulse" : ""} />
-             </button>
              
              {/* User Avatar Placeholder */}
              {user.photoURL ? (
@@ -367,11 +369,11 @@ export default function App() {
                         </h2>
 
                         <div className="space-y-6">
-                            {/* Master Control */}
-                            <div className="bg-slate-950 p-4 rounded-lg border border-slate-800">
-                                <label className="text-xs text-amber-500 font-bold uppercase tracking-wider mb-2 block">Base Full-Time Rate (Yearly)</label>
-                                <div className="flex items-center gap-4">
-                                    <div className="relative flex-1">
+                            {/* Master Control: Base Price + Total Learners */}
+                            <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                                <div className="md:col-span-2">
+                                    <label className="text-xs text-amber-500 font-bold uppercase tracking-wider mb-2 block">Base Full-Time Rate (Yearly)</label>
+                                    <div className="relative">
                                         <span className="absolute left-4 top-3 text-slate-500 text-lg">$</span>
                                         <input 
                                             type="number" 
@@ -380,6 +382,12 @@ export default function App() {
                                             className="w-full bg-slate-900 text-3xl font-bold text-white pl-8 pr-4 py-2 rounded border border-slate-700 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
                                         />
                                     </div>
+                                </div>
+                                <div className="md:col-span-1 h-full">
+                                     <div className="h-full flex flex-col justify-center p-4 bg-slate-900/50 rounded-lg border border-slate-800/50">
+                                        <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1 text-right">Total Learners</label>
+                                        <div className="text-4xl font-bold text-white text-right">{financials.totalHeadcount}</div>
+                                     </div>
                                 </div>
                             </div>
 
@@ -405,14 +413,14 @@ export default function App() {
                                         <div className="flex justify-between items-center gap-2">
                                             {/* Ratio Input */}
                                             {tier.id !== 'tuitionFT' ? (
-                                                <div className="relative w-20">
+                                                <div className="relative w-24">
                                                     <input 
                                                         type="number"
                                                         value={Math.round(tier.ratio)}
                                                         onChange={(e) => handleTierPriceOrRatioChange(tier.id, 'ratio', parseFloat(e.target.value) || 0)}
-                                                        className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-right text-xs text-slate-400 focus:text-white focus:border-amber-500 outline-none"
+                                                        className="peer w-full bg-slate-900 border border-slate-700 rounded pl-2 pr-6 py-1 text-right text-xs text-slate-400 focus:text-white focus:border-amber-500 outline-none"
                                                     />
-                                                    <span className="absolute right-6 top-1 text-slate-600 text-xs pointer-events-none">%</span>
+                                                    <span className="absolute right-2 top-1.5 text-slate-600 text-xs pointer-events-none peer-focus:hidden">%</span>
                                                 </div>
                                             ) : (
                                                 <span className="text-xs text-slate-500">Base Rate</span>
@@ -465,14 +473,14 @@ export default function App() {
                                                 />
                                             </td>
                                             <td className="px-4 py-3 text-center">
-                                                <div className="relative inline-block w-16">
+                                                <div className="relative inline-block w-20">
                                                     <input 
                                                         type="number"
                                                         value={disc.discountPercent}
                                                         onChange={(e) => handleDiscountChange(disc.id, 'discountPercent', parseFloat(e.target.value) || 0)}
-                                                        className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-right text-white focus:border-amber-500 outline-none"
+                                                        className="peer w-full bg-slate-950 border border-slate-700 rounded pl-2 pr-6 py-1 text-right text-white focus:border-amber-500 outline-none"
                                                     />
-                                                    <span className="absolute right-6 top-1 text-slate-500 pointer-events-none text-xs">%</span>
+                                                    <span className="absolute right-2 top-1.5 text-slate-500 pointer-events-none text-xs peer-focus:hidden">%</span>
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3 text-right text-rose-400">

@@ -55,9 +55,9 @@ export const INITIAL_STATE: FinancialState = {
     }
   },
   discounts: {
-    staff: { id: 'staff', label: 'Staff Discount', qty: 3, discountPercent: 50 },
-    sibling: { id: 'sibling', label: 'Sibling Discount', qty: 10, discountPercent: 5 },
-    early: { id: 'early', label: 'Early Bird', qty: 15, discountPercent: 5 },
+    staff: { id: 'staff', label: 'Staff Discount', qty: 2, discountPercent: 50 },
+    sibling: { id: 'sibling', label: 'Sibling Discount', qty: 8, discountPercent: 5 },
+    early: { id: 'early', label: 'Early Bird', qty: 12, discountPercent: 5 },
   },
   revenueItems: BASELINE_REVENUE,
   budgetItems: BASELINE_BUDGET
