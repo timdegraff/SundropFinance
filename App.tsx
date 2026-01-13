@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
-import { SunIcon, LockIcon, TrendingUpIcon, PieChartIcon, SaveIcon } from "./components/Icons";
-import { SmartTable } from "./components/SmartTable";
-import { calculateFinancials, calculateItemTotal } from "./services/calculationService";
-import { saveState, loadState, loginWithGoogle, subscribeToState, logout } from "./services/firebaseService";
-import { INITIAL_STATE } from "./constants";
-import { FinancialState, CARDS, TuitionTier } from "./types";
+import { SunIcon, LockIcon, TrendingUpIcon, PieChartIcon, SaveIcon } from "./components/Icons.tsx";
+import { SmartTable } from "./components/SmartTable.tsx";
+import { calculateFinancials, calculateItemTotal } from "./services/calculationService.ts";
+import { saveState, loadState, loginWithGoogle, subscribeToState, logout } from "./services/firebaseService.ts";
+import { INITIAL_STATE } from "./constants.ts";
+import { FinancialState, CARDS, TuitionTier } from "./types.ts";
 
 // Recharts Colors
 const COLORS = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#6366f1', '#ec4899'];
@@ -278,7 +278,7 @@ export default function App() {
             <div className="w-8 h-8 bg-amber-500 rounded flex items-center justify-center text-black">
                 <SunIcon className="w-5 h-5" />
             </div>
-            <span className="text-lg font-bold tracking-tight text-slate-100 hidden sm:inline">Sun Drop <span className="text-amber-500">FINANCE</span></span>
+            <span className="text-lg font-bold tracking-tight text-slate-100 hidden sm:inline">Sundrop <span className="text-amber-500">FINANCE</span></span>
           </div>
 
           <nav className="flex items-center space-x-1 bg-slate-800/50 rounded-full p-1">
@@ -336,17 +336,17 @@ export default function App() {
                 </div>
                 <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
                     <p className="text-slate-500 text-xs uppercase font-bold mb-1">Net Tuition</p>
-                    <p className="text-2xl font-bold text-amber-500">${Math.round(financials.netTuition / 1000)}k</p>
+                    <p className="text-2xl font-bold text-amber-500">${Math.round(financials.netTuition / 1000)}K</p>
                 </div>
                 <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
                     <p className="text-slate-500 text-xs uppercase font-bold mb-1">Total Exp</p>
-                    <p className="text-2xl font-bold text-rose-500">${Math.round(financials.totalExpenses / 1000)}k</p>
+                    <p className="text-2xl font-bold text-rose-500">${Math.round(financials.totalExpenses / 1000)}K</p>
                 </div>
                 <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
                     <p className="text-slate-500 text-xs uppercase font-bold mb-1">Margin</p>
                     <div className="flex items-baseline gap-2">
                          <p className={`text-xl font-bold ${financials.netMargin >= 0 ? 'text-teal-500' : 'text-rose-500'}`}>
-                            ${Math.round(financials.netMargin / 1000)}k
+                            ${Math.round(financials.netMargin / 1000)}K
                         </p>
                         <p className={`text-sm font-bold ${financials.marginPercent >= 0 ? 'text-teal-500' : 'text-rose-500'}`}>
                             {financials.marginPercent.toFixed(1)}%
@@ -489,6 +489,15 @@ export default function App() {
                                         </tr>
                                     ))}
                                 </tbody>
+                                <tfoot className="bg-slate-950/50 font-bold border-t border-slate-800">
+                                    <tr>
+                                        <td className="px-4 py-3 text-slate-400">TOTAL</td>
+                                        <td colSpan={2}></td>
+                                        <td className="px-4 py-3 text-right text-rose-500">
+                                            -${Math.round(financials.totalDiscounts).toLocaleString()}
+                                        </td>
+                                    </tr>
+                                </tfoot>
                             </table>
                         </div>
                     </div>
@@ -535,7 +544,7 @@ export default function App() {
                                             <span className="text-slate-300 truncate max-w-[120px]">{item.name}</span>
                                         </div>
                                         <div className="flex gap-4">
-                                            <span className="font-mono text-slate-400">${Math.round(item.value / 1000)}k</span>
+                                            <span className="font-mono text-slate-400">${Math.round(item.value / 1000)}K</span>
                                             <span className="font-mono text-slate-500 w-10 text-right">{Math.round(percent)}%</span>
                                         </div>
                                     </div>

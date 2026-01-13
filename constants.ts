@@ -1,4 +1,4 @@
-import { LineItem, FinancialState } from "./types";
+import { LineItem, FinancialState } from "./types.ts";
 
 export const BASELINE_BUDGET: LineItem[] = [
   { id: 'b_salaries', label: '101-702 Salaries & Wages', baseline: 190000, modifierPercent: 0, modifierFixed: 0 },
@@ -49,8 +49,10 @@ export const INITIAL_STATE: FinancialState = {
     baseFTPrice: 7520,
     tiers: {
       tuitionFT: { id: 'tuitionFT', label: 'Full-Time (5 Days)', price: 7520, qty: 30, ratio: 100 },
+      tuition4Day: { id: 'tuition4Day', label: '4-Day Tier', price: 6016, qty: 4, ratio: 80 },
       tuition3Day: { id: 'tuition3Day', label: '3-Day Tier', price: 4512, qty: 5, ratio: 60 },
-      tuition2Day: { id: 'tuition2Day', label: '4-Day Tier', price: 6016, qty: 4, ratio: 80 },
+      tuition2Day: { id: 'tuition2Day', label: '2-Day Tier', price: 3008, qty: 0, ratio: 40 },
+      tuition1Day: { id: 'tuition1Day', label: '1-Day Tier', price: 1504, qty: 0, ratio: 20 },
       tuitionHalfDay: { id: 'tuitionHalfDay', label: 'Half-Day (5 Days)', price: 3760, qty: 4, ratio: 50 },
     }
   },

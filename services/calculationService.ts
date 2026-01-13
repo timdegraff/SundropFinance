@@ -1,4 +1,4 @@
-import { FinancialState, LineItem, TuitionTier, DiscountTier } from "../types";
+import { FinancialState, LineItem, TuitionTier, DiscountTier } from "../types.ts";
 
 export const calculateItemTotal = (item: LineItem): number => {
   const percentMod = item.baseline * (item.modifierPercent / 100);

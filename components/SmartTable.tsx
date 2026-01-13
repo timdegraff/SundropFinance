@@ -1,6 +1,6 @@
 import React from "react";
-import { LineItem } from "../types";
-import { calculateItemTotal } from "../services/calculationService";
+import { LineItem } from "../types.ts";
+import { calculateItemTotal } from "../services/calculationService.ts";
 
 interface SmartTableProps {
   items: LineItem[];

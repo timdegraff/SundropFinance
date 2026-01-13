@@ -7,7 +7,7 @@ export interface LineItem {
 }
 
 export interface TuitionTier {
-  id: 'tuitionFT' | 'tuition3Day' | 'tuition2Day' | 'tuitionHalfDay';
+  id: 'tuitionFT' | 'tuition4Day' | 'tuition3Day' | 'tuition2Day' | 'tuition1Day' | 'tuitionHalfDay';
   label: string;
   price: number; // Base price for FT, calculated for others
   qty: number;

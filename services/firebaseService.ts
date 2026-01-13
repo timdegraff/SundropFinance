@@ -1,8 +1,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { FIREBASE_CONFIG, INITIAL_STATE } from "../constants";
-import { FinancialState } from "../types";
+import { FIREBASE_CONFIG, INITIAL_STATE } from "../constants.ts";
+import { FinancialState } from "../types.ts";
 
 const app = initializeApp(FIREBASE_CONFIG);
 const db = getFirestore(app);
