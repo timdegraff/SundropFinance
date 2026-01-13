@@ -1,3 +1,4 @@
+
 import { LineItem, FinancialState } from "./types.ts";
 
 export const BASELINE_BUDGET: LineItem[] = [
