@@ -5,7 +5,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-// --- TYPES & CONSTANTS ---
+// --- 1. TYPES ---
 
 type TabType = 'strategy' | 'revenue' | 'budget';
 
@@ -42,6 +42,8 @@ interface FinancialState {
   budgetItems: LineItem[];
 }
 
+// --- 2. CONSTANTS & CONFIG ---
+
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyAsvSVxYOAqKe9pS9xvnD5QZzrsPi-h3TA",
   authDomain: "sundrop-finance.firebaseapp.com",
@@ -52,16 +54,19 @@ const FIREBASE_CONFIG = {
 };
 
 const ALLOWED_EMAILS = ["degraff.tim@gmail.com", "mariahfrye@gmail.com", "watterstj1@gmail.com"];
+const DOC_ID = "fy27_master_plan";
+const COLORS = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#6366f1', '#ec4899'];
 
 const INITIAL_STATE: FinancialState = {
   tuition: {
     baseFTPrice: 7520,
     tiers: {
-      tuitionFT: { id: 'tuitionFT', label: 'Full-Time (5 Days)', price: 7520, qty: 30, ratio: 100 },
-      tuition4Day: { id: 'tuition4Day', label: '4-Day Tier', price: 6016, qty: 4, ratio: 80 },
-      tuition3Day: { id: 'tuition3Day', label: '3-Day Tier', price: 4512, qty: 5, ratio: 60 },
-      tuition2Day: { id: 'tuition2Day', label: '2-Day Tier', price: 3008, qty: 0, ratio: 40 },
-      tuitionHalfDay: { id: 'tuitionHalfDay', label: 'Half-Day (5 Days)', price: 3760, qty: 4, ratio: 50 },
+      tuitionFT: { id: 'tuitionFT', label: 'Full-Time (5 Days)', price: 7520, qty: 19, ratio: 100 },
+      tuition4Day: { id: 'tuition4Day', label: '4-Day Tier', price: 6016, qty: 6, ratio: 80 },
+      tuition3Day: { id: 'tuition3Day', label: '3-Day Tier', price: 4512, qty: 7, ratio: 60 },
+      tuition2Day: { id: 'tuition2Day', label: '2-Day Tier', price: 3008, qty: 4, ratio: 40 },
+      tuition1Day: { id: 'tuition1Day', label: '1-Day Tier', price: 1504, qty: 7, ratio: 20 },
+      tuitionHalfDay: { id: 'tuitionHalfDay', label: 'Half-Day (5 Days)', price: 3760, qty: 0, ratio: 50 },
     }
   },
   discounts: {
@@ -80,18 +85,17 @@ const INITIAL_STATE: FinancialState = {
   ]
 };
 
-// --- SERVICES ---
+// --- 3. LOGIC & HELPERS ---
 
 const app = initializeApp(FIREBASE_CONFIG);
 const db = getFirestore(app);
 const auth = getAuth(app);
-const DOC_ID = "fy27_master_plan";
 
 const calculateItemTotal = (item: LineItem): number => {
   return item.baseline + (item.baseline * (item.modifierPercent / 100)) + item.modifierFixed;
 };
 
-// --- ICONS ---
+// --- 4. ICONS ---
 
 const Icons = {
   Sun: ({ className }: any) => (
@@ -111,7 +115,7 @@ const Icons = {
   )
 };
 
-// --- TABLE COMPONENT ---
+// --- 5. COMPONENTS ---
 
 const SmartTable = ({ items, type, onUpdate, onAdd, onDelete, readOnlyIds = [] }: any) => {
   const isRevenue = type === 'revenue';
@@ -217,7 +221,7 @@ const SmartTable = ({ items, type, onUpdate, onAdd, onDelete, readOnlyIds = [] }
   );
 };
 
-// --- MAIN APP ---
+// --- 6. MAIN APP ---
 
 function App() {
   const [user, setUser] = useState<any>(null);
@@ -316,23 +320,18 @@ function App() {
     ].filter(v => v.value > 0);
   }, [financials]);
 
-  // LOGIN SCREEN (RESTORED DESIGN)
   if (!user) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-xl p-8 shadow-2xl relative overflow-hidden">
-          {/* Accent Bar */}
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-rose-500"></div>
-          
           <div className="flex justify-center mb-6">
             <div className="w-16 h-16 bg-amber-500/10 rounded-lg flex items-center justify-center border border-amber-500/20">
                <Icons.Sun className="w-8 h-8 text-amber-500" />
             </div>
           </div>
-          
           <h1 className="text-2xl font-bold text-center text-white mb-2">Sundrop Finance</h1>
           <p className="text-center text-slate-400 mb-8 text-sm">Strategic Planning & Forecasting FY27</p>
-          
           <div className="space-y-4">
             <button 
                 onClick={() => signInWithPopup(auth, new GoogleAuthProvider())}
@@ -353,7 +352,6 @@ function App() {
     );
   }
 
-  // MAIN DASHBOARD (REMAINED CONSISTENT)
   return (
     <div className="min-h-screen pb-20 text-slate-300">
       <header className="sticky top-0 z-50 glass-panel border-b border-slate-800/50 px-6 h-16 flex items-center justify-between">
@@ -454,7 +452,7 @@ function App() {
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                          {pieData.map((_, i) => <Cell key={i} fill={['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6'][i % 4]} stroke="none" />)}
+                          {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="none" />)}
                         </Pie>
                         <Tooltip contentStyle={{background: '#0a0f1d', border: '1px solid #1e293b', borderRadius: '12px'}} />
                       </PieChart>
@@ -496,7 +494,7 @@ function App() {
       </main>
 
       <footer className="fixed bottom-0 left-0 w-full bg-slate-950/80 backdrop-blur-sm border-t border-slate-900 py-2 px-6 text-[9px] font-bold text-slate-700 flex justify-between tracking-widest uppercase">
-        <span>Sundrop Finance FY27 v2.2</span>
+        <span>Sundrop Finance FY27 v2.3</span>
         <span>{lastSaved ? `Synced: ${lastSaved.toLocaleTimeString()}` : 'Live Session'}</span>
       </footer>
     </div>
