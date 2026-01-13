@@ -2,45 +2,10 @@ import React, { useState, useEffect, useMemo } from "react";
 import ReactDOM from "react-dom/client";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { getAuth, signInWithPopup, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-// --- TYPES & CONSTANTS ---
-
-type TabType = 'strategy' | 'revenue' | 'budget';
-
-interface LineItem {
-  id: string;
-  label: string;
-  baseline: number;
-  modifierPercent: number;
-  modifierFixed: number;
-}
-
-interface TuitionTier {
-  id: string;
-  label: string;
-  price: number;
-  qty: number;
-  ratio: number;
-}
-
-interface DiscountTier {
-  id: string;
-  label: string;
-  qty: number;
-  discountPercent: number;
-}
-
-interface FinancialState {
-  tuition: {
-    baseFTPrice: number;
-    tiers: Record<string, TuitionTier>;
-  };
-  discounts: Record<string, DiscountTier>;
-  revenueItems: LineItem[];
-  budgetItems: LineItem[];
-}
+// --- CONFIG & CONSTANTS ---
 
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyAsvSVxYOAqKe9pS9xvnD5QZzrsPi-h3TA",
@@ -52,17 +17,19 @@ const FIREBASE_CONFIG = {
 };
 
 const ALLOWED_EMAILS = ["degraff.tim@gmail.com", "mariahfrye@gmail.com", "watterstj1@gmail.com"];
+const DOC_ID = "fy27_master_plan";
+const CHART_COLORS = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#6366f1', '#ec4899'];
 
-const INITIAL_STATE: FinancialState = {
+const INITIAL_STATE = {
   tuition: {
     baseFTPrice: 7520,
     tiers: {
-      tuitionFT: { id: 'tuitionFT', label: 'Full-Time (5 Days)', price: 7520, qty: 19, ratio: 100 },
-      tuition4Day: { id: 'tuition4Day', label: '4-Day Tier', price: 6016, qty: 6, ratio: 80 },
-      tuition3Day: { id: 'tuition3Day', label: '3-Day Tier', price: 4512, qty: 7, ratio: 60 },
-      tuition2Day: { id: 'tuition2Day', label: '2-Day Tier', price: 3008, qty: 4, ratio: 40 },
-      tuition1Day: { id: 'tuition1Day', label: '1-Day Tier', price: 1504, qty: 7, ratio: 20 },
-      tuitionHalfDay: { id: 'tuitionHalfDay', label: 'Half-Day (5 Days)', price: 3760, qty: 0, ratio: 50 },
+      tuitionFT: { id: 'tuitionFT', label: 'Full-Time (5 Days)', qty: 19, ratio: 100 },
+      tuition4Day: { id: 'tuition4Day', label: '4-Day Tier', qty: 6, ratio: 80 },
+      tuition3Day: { id: 'tuition3Day', label: '3-Day Tier', qty: 7, ratio: 60 },
+      tuition2Day: { id: 'tuition2Day', label: '2-Day Tier', qty: 4, ratio: 40 },
+      tuition1Day: { id: 'tuition1Day', label: '1-Day Tier', qty: 7, ratio: 20 },
+      tuitionHalfDay: { id: 'tuitionHalfDay', label: 'Half-Day (5 Days)', qty: 0, ratio: 50 },
     }
   },
   discounts: {
@@ -81,44 +48,44 @@ const INITIAL_STATE: FinancialState = {
   ]
 };
 
-// --- SERVICES ---
+// --- APP INITIALIZATION ---
 
 const app = initializeApp(FIREBASE_CONFIG);
 const db = getFirestore(app);
 const auth = getAuth(app);
-const DOC_ID = "fy27_master_plan";
 
-const calculateItemTotal = (item: LineItem): number => {
+const calculateItemTotal = (item) => {
   return item.baseline + (item.baseline * (item.modifierPercent / 100)) + item.modifierFixed;
 };
 
 // --- ICONS ---
 
+// Added default empty string values to className props to resolve TypeScript errors when icons are used without parameters.
 const Icons = {
-  Sun: ({ className }: any) => (
+  Sun: ({ className = "" }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
   ),
-  Save: ({ className }: any) => (
+  Save: ({ className = "" }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
   ),
-  Trash: ({ className }: any) => (
+  Trash: ({ className = "" }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
   ),
-  Plus: ({ className }: any) => (
+  Plus: ({ className = "" }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
   ),
-  TrendingUp: ({ className }: any) => (
+  TrendingUp: ({ className = "" }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
   )
 };
 
-// --- TABLE COMPONENT ---
+// --- COMPONENTS ---
 
-const SmartTable = ({ items, type, onUpdate, onAdd, onDelete, readOnlyIds = [] }: any) => {
+const SmartTable = ({ items, type, onUpdate, onAdd, onDelete, readOnlyIds = [] }) => {
   const isRevenue = type === 'revenue';
   const totalColor = isRevenue ? 'text-teal-400' : 'text-rose-400';
-  const totalBaseline = items.reduce((acc: number, i: any) => acc + i.baseline, 0);
-  const totalFinal = items.reduce((acc: number, i: any) => acc + calculateItemTotal(i), 0);
+  const totalBaseline = items.reduce((acc, i) => acc + i.baseline, 0);
+  const totalFinal = items.reduce((acc, i) => acc + calculateItemTotal(i), 0);
 
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/50 backdrop-blur">
@@ -134,7 +101,7 @@ const SmartTable = ({ items, type, onUpdate, onAdd, onDelete, readOnlyIds = [] }
           </tr>
         </thead>
         <tbody>
-          {items.map((item: any) => {
+          {items.map((item) => {
             const isReadOnly = readOnlyIds.includes(item.id);
             const final = calculateItemTotal(item);
             const delta = final - item.baseline;
@@ -204,7 +171,7 @@ const SmartTable = ({ items, type, onUpdate, onAdd, onDelete, readOnlyIds = [] }
           <tr>
             <td className="px-6 py-4">
                <button onClick={onAdd} className="flex items-center gap-2 text-[10px] text-amber-500 hover:text-amber-400 uppercase tracking-widest font-black transition-colors">
-                <Icons.Plus /> Add Line Item
+                <Icons.Plus className="w-3.5 h-3.5" /> Add Line Item
               </button>
             </td>
             <td className="px-6 py-4 text-right opacity-50">${Math.round(totalBaseline).toLocaleString()}</td>
@@ -221,35 +188,54 @@ const SmartTable = ({ items, type, onUpdate, onAdd, onDelete, readOnlyIds = [] }
 // --- MAIN APP ---
 
 function App() {
-  const [user, setUser] = useState<any>(null);
-  const [state, setState] = useState<FinancialState>(INITIAL_STATE);
-  const [activeTab, setActiveTab] = useState<TabType>('strategy');
+  const [user, setUser] = useState(null);
+  const [state, setState] = useState(INITIAL_STATE);
+  const [activeTab, setActiveTab] = useState('strategy');
   const [isSaving, setIsSaving] = useState(false);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [lastSaved, setLastSaved] = useState(null);
 
+  // Monitor Auth State
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((u) => {
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
       if (u && ALLOWED_EMAILS.includes(u.email)) {
         setUser(u);
-        onSnapshot(doc(db, "plans", DOC_ID), (snap) => {
-          if (snap.exists()) setState(snap.data());
-        });
       } else if (u) {
         signOut(auth);
+        setUser(null);
+      } else {
+        setUser(null);
       }
     });
     return () => unsubscribe();
   }, []);
 
+  // Listen for Data after login only
+  useEffect(() => {
+    if (!user) return;
+    const unsubscribe = onSnapshot(doc(db, "plans", DOC_ID), (snap) => {
+      if (snap.exists()) {
+        const cloudData = snap.data();
+        setState(prev => ({ ...prev, ...cloudData }));
+      }
+    }, (error) => {
+      console.warn("Snapshot Error (Likely Permission):", error.message);
+    });
+    return () => unsubscribe();
+  }, [user]);
+
   const handleSave = async () => {
     if (!user) return;
     setIsSaving(true);
-    await setDoc(doc(db, "plans", DOC_ID), state);
-    setLastSaved(new Date());
+    try {
+      await setDoc(doc(db, "plans", DOC_ID), state);
+      setLastSaved(new Date());
+    } catch (e) {
+      console.error("Save Error:", e.message);
+    }
     setIsSaving(false);
   };
 
-  const handleUpdate = (type: 'revenue' | 'budget', id: string, field: string, val: any) => {
+  const handleUpdate = (type, id, field, val) => {
     setState(prev => {
       const list = type === 'revenue' ? prev.revenueItems : prev.budgetItems;
       const newList = list.map(item => {
@@ -317,23 +303,19 @@ function App() {
     ].filter(v => v.value > 0);
   }, [financials]);
 
-  // LOGIN SCREEN (RESTORED DESIGN)
+  // LOGIN SCREEN
   if (!user) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-xl p-8 shadow-2xl relative overflow-hidden">
-          {/* Accent Bar */}
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-rose-500"></div>
-          
           <div className="flex justify-center mb-6">
             <div className="w-16 h-16 bg-amber-500/10 rounded-lg flex items-center justify-center border border-amber-500/20">
                <Icons.Sun className="w-8 h-8 text-amber-500" />
             </div>
           </div>
-          
-          <h1 className="text-2xl font-bold text-center text-white mb-2">Sundrop Finance</h1>
-          <p className="text-center text-slate-400 mb-8 text-sm">Strategic Planning & Forecasting FY27</p>
-          
+          <h1 className="text-2xl font-bold text-center text-white mb-2 tracking-tight">Sundrop Finance</h1>
+          <p className="text-center text-slate-400 mb-8 text-sm">Authorized Strategic Planning FY27</p>
           <div className="space-y-4">
             <button 
                 onClick={() => signInWithPopup(auth, new GoogleAuthProvider())}
@@ -347,24 +329,23 @@ function App() {
               </svg>
               Sign in with Google
             </button>
-            <p className="text-[10px] text-center text-slate-600 uppercase tracking-widest font-bold">Secure Authorized Access Only</p>
+            <p className="text-[10px] text-center text-slate-600 uppercase tracking-widest font-black opacity-60">Secure Access Restricted</p>
           </div>
         </div>
       </div>
     );
   }
 
-  // MAIN DASHBOARD (REMAINED CONSISTENT)
   return (
-    <div className="min-h-screen pb-20 text-slate-300">
+    <div className="min-h-screen pb-20 text-slate-300 bg-[#0a0f1d]">
       <header className="sticky top-0 z-50 glass-panel border-b border-slate-800/50 px-6 h-16 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-1.5 bg-amber-500 rounded text-black"><Icons.Sun className="w-5 h-5" /></div>
+          <div className="p-1.5 bg-amber-500 rounded text-black shadow-lg shadow-amber-500/20"><Icons.Sun className="w-5 h-5" /></div>
           <span className="text-lg font-black text-white uppercase tracking-tighter">Sundrop <span className="text-amber-500">Finance</span></span>
         </div>
         <nav className="flex gap-1 bg-slate-950 rounded-full p-1 border border-slate-800">
           {['strategy', 'revenue', 'budget'].map(t => (
-            <button key={t} onClick={() => setActiveTab(t as TabType)} className={`px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === t ? 'bg-slate-800 text-white shadow-xl' : 'text-slate-500 hover:text-slate-300'}`}>
+            <button key={t} onClick={() => setActiveTab(t)} className={`px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === t ? 'bg-slate-800 text-white shadow-xl' : 'text-slate-500 hover:text-slate-300'}`}>
               {t}
             </button>
           ))}
@@ -376,8 +357,8 @@ function App() {
                 ${Math.round(financials.totalRev - financials.totalExp).toLocaleString()}
               </div>
            </div>
-           <button onClick={handleSave} className={`px-4 py-1.5 rounded-lg flex items-center gap-2 text-xs font-bold ${isSaving ? 'bg-amber-500/10 text-amber-500 animate-pulse' : 'bg-slate-800 text-slate-200 hover:bg-slate-700'}`}>
-              <Icons.Save className="w-3.5 h-3.5" /> {isSaving ? '...' : 'SAVE'}
+           <button onClick={handleSave} className={`px-4 py-1.5 rounded-lg flex items-center gap-2 text-xs font-bold transition-all ${isSaving ? 'bg-amber-500/10 text-amber-500 animate-pulse' : 'bg-slate-800 text-slate-200 hover:bg-slate-700 active:scale-95'}`}>
+              <Icons.Save className="w-3.5 h-3.5" /> {isSaving ? 'SYNCING' : 'SAVE'}
            </button>
         </div>
       </header>
@@ -386,14 +367,14 @@ function App() {
         {activeTab === 'strategy' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
             <div className="lg:col-span-2 space-y-8">
-              <section className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-8 relative overflow-hidden">
+              <section className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-8 relative overflow-hidden shadow-2xl">
                 <div className="absolute top-0 right-0 p-4 opacity-[0.03]">
                     <Icons.TrendingUp className="w-32 h-32 text-amber-500" />
                 </div>
                 <div className="flex justify-between items-end border-b border-slate-800 pb-6">
                   <div>
                     <h2 className="text-xl font-black text-white uppercase tracking-tighter">Tuition Engine</h2>
-                    <p className="text-slate-500 text-xs">FY27 Rate Scaling & Enrollment</p>
+                    <p className="text-slate-500 text-xs">FY27 Rate Scaling & Enrollment (Current counts set)</p>
                   </div>
                   <div className="text-right">
                     <label className="text-[10px] uppercase font-bold text-amber-500 mb-1 block">FT Base Rate</label>
@@ -421,7 +402,7 @@ function App() {
                 </div>
               </section>
 
-              <section className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+              <section className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
                 <h3 className="text-lg font-black text-white uppercase tracking-tighter mb-6">Discounts & Aid</h3>
                 <div className="space-y-3">
                   {financials.discounts.map(d => (
@@ -441,7 +422,7 @@ function App() {
                     </div>
                   ))}
                    <div className="pt-4 flex justify-between font-black text-rose-500 border-t border-slate-800 text-sm">
-                    <span className="uppercase tracking-widest">Total Discounts</span>
+                    <span className="uppercase tracking-widest">Total Net Discounts</span>
                     <span>-${Math.round(financials.totalDiscounts).toLocaleString()}</span>
                   </div>
                 </div>
@@ -449,15 +430,15 @@ function App() {
             </div>
 
             <div className="space-y-8">
-               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 h-[480px] flex flex-col">
+               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 min-h-[480px] flex flex-col shadow-xl">
                   <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Revenue Mix (Projected)</h3>
-                  <div className="flex-1">
+                  <div className="flex-1 min-h-[300px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                          {pieData.map((_, i) => <Cell key={i} fill={['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6'][i % 4]} stroke="none" />)}
+                        <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" animationDuration={800}>
+                          {pieData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} stroke="none" />)}
                         </Pie>
-                        <Tooltip contentStyle={{background: '#0a0f1d', border: '1px solid #1e293b', borderRadius: '12px'}} />
+                        <Tooltip contentStyle={{background: '#0a0f1d', border: '1px solid #1e293b', borderRadius: '12px', fontSize: '10px'}} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
@@ -496,9 +477,13 @@ function App() {
         )}
       </main>
 
-      <footer className="fixed bottom-0 left-0 w-full bg-slate-950/80 backdrop-blur-sm border-t border-slate-900 py-2 px-6 text-[9px] font-bold text-slate-700 flex justify-between tracking-widest uppercase">
-        <span>Sundrop Finance FY27 v2.2</span>
-        <span>{lastSaved ? `Synced: ${lastSaved.toLocaleTimeString()}` : 'Live Session'}</span>
+      <footer className="fixed bottom-0 left-0 w-full bg-slate-950/80 backdrop-blur-sm border-t border-slate-900 py-2 px-6 text-[9px] font-bold text-slate-700 flex justify-between tracking-widest uppercase items-center">
+        <div className="flex items-center gap-4">
+            <span>Sundrop Finance FY27 v2.3</span>
+            <span className="text-slate-800">|</span>
+            <span className={user ? 'text-teal-900' : 'text-rose-900'}>{user ? 'AUTH ACTIVE' : 'NO AUTH'}</span>
+        </div>
+        <span>{lastSaved ? `LAST SYNC: ${lastSaved.toLocaleTimeString()}` : 'SESSION ACTIVE'}</span>
       </footer>
     </div>
   );
