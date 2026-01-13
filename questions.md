@@ -12,3 +12,7 @@ Here is the implementation of the FY27 Strategic Planner. To refine it further, 
 8.  **Mobile Usage:** On phone screens, the wide tables (Baseline, % Mod, $ Mod, Final) will be cramped. Should I hide the "Baseline" columns on mobile and only show the "Final" numbers and modifiers?
 9.  **Legacy Data:** You provided FY26 Actuals. Do you want a column explicitly showing "Year-over-Year Delta" (e.g., "Rent is up 5% vs FY26")?
 10. **Export:** Do you require a feature to export the final grid to CSV or PDF for board meetings?
+
+## FUTURE BLUEPRINT NOTES
+- **Export Functionality:** We will add functional buttons to export the Grid Views to PDF and CSV. Currently, these are placeholder buttons.
+- **Mobile Layout:** The current complex financial tables are designed for Desktop. A specific mobile card view will be implemented in a future iteration.

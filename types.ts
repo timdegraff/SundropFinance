@@ -34,5 +34,6 @@ export interface FinancialState {
 export const CARDS = {
     STRATEGY: 'strategy',
     REVENUE: 'revenue',
-    BUDGET: 'budget'
+    BUDGET: 'budget',
+    MONTHLY: 'monthly'
 };
