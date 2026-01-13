@@ -20,6 +20,7 @@ const ALLOWED_EMAILS = [
 export default function App() {
   const [user, setUser] = useState<any>(null);
   const [authError, setAuthError] = useState("");
+  const [isOffline, setIsOffline] = useState(false);
   
   const [activeTab, setActiveTab] = useState(CARDS.STRATEGY);
   const [state, setState] = useState<FinancialState>(INITIAL_STATE);
@@ -28,7 +29,7 @@ export default function App() {
 
   // Load from Firebase on Mount & Subscribe
   useEffect(() => {
-    if (user) {
+    if (user && !isOffline) {
         // Initial load
         loadState().then(data => {
             if (data) setState(data);
@@ -41,7 +42,7 @@ export default function App() {
         });
         return () => unsubscribe();
     }
-  }, [user]);
+  }, [user, isOffline]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,16 +57,37 @@ export default function App() {
             return; 
         }
         
+        setIsOffline(false);
         setUser(googleUser);
         setAuthError("");
     } else {
-        setAuthError("Google Login Failed.");
+        setAuthError("Google Login Failed. Try 'Offline Preview' if in a sandbox.");
     }
+  };
+
+  const handleOfflineLogin = () => {
+    // Simulates a logged-in state for development/preview without Firebase
+    setUser({
+        uid: "offline-preview",
+        email: ALLOWED_EMAILS[0],
+        displayName: "Preview User",
+        photoURL: null
+    });
+    setIsOffline(true);
+    setAuthError("");
   };
 
   const handleSave = async () => {
     setIsSaving(true);
-    await saveState(state);
+    
+    if (isOffline) {
+        // Simulate save delay
+        await new Promise(resolve => setTimeout(resolve, 600));
+        console.log("Offline Mode: Changes saved to local session only.");
+    } else {
+        await saveState(state);
+    }
+    
     setLastSaved(new Date());
     setIsSaving(false);
   };
@@ -194,6 +216,7 @@ export default function App() {
           
           <div className="space-y-4">
             {authError && <p className="text-rose-500 text-xs text-center">{authError}</p>}
+            
             <button 
                 onClick={handleLogin}
                 className="w-full bg-white text-slate-900 font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-3 hover:bg-slate-100"
@@ -207,6 +230,16 @@ export default function App() {
               Sign in with Google
             </button>
             <p className="text-xs text-center text-slate-600">Secure Access Only</p>
+
+            {/* Offline/Preview Bypass */}
+            <div className="pt-4 mt-2 border-t border-slate-800 text-center">
+                <button 
+                    onClick={handleOfflineLogin}
+                    className="text-[10px] text-amber-500 hover:text-amber-400 underline uppercase tracking-wide opacity-80 hover:opacity-100"
+                >
+                    Enter Offline Preview (No Auth)
+                </button>
+            </div>
           </div>
         </div>
       </div>
@@ -270,8 +303,8 @@ export default function App() {
              <button 
                 onClick={handleSave}
                 disabled={isSaving}
-                className="p-2 rounded-full hover:bg-slate-800 text-slate-400 hover:text-amber-500 transition-colors"
-                title="Save to Cloud"
+                className={`p-2 rounded-full transition-colors ${isOffline ? 'text-slate-600 cursor-not-allowed' : 'hover:bg-slate-800 text-slate-400 hover:text-amber-500'}`}
+                title={isOffline ? "Saving disabled in Offline Mode" : "Save to Cloud"}
             >
                  <SaveIcon className={isSaving ? "animate-pulse" : ""} />
              </button>
@@ -280,7 +313,9 @@ export default function App() {
              {user.photoURL ? (
                  <img src={user.photoURL} alt="User" className="w-8 h-8 rounded-full border border-slate-700" />
              ) : (
-                 <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs">{user.email[0]}</div>
+                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs border border-slate-700 ${isOffline ? 'bg-slate-800 text-slate-500' : 'bg-amber-500 text-slate-900 font-bold'}`}>
+                    {user.displayName ? user.displayName[0] : user.email[0]}
+                 </div>
              )}
           </div>
         </div>
@@ -552,7 +587,7 @@ export default function App() {
 
       {/* Footer / Status */}
       <div className="fixed bottom-0 left-0 w-full bg-slate-950/80 backdrop-blur border-t border-slate-900 py-2 px-4 text-xs text-slate-600 flex justify-between items-center z-40">
-        <span>Sundrop Finance v27.2 (Firebase Auth)</span>
+        <span>{isOffline ? "Offline Preview Mode (Data not saved to Cloud)" : "Sundrop Finance v27.2 (Firebase Auth)"}</span>
         <span>
             {lastSaved ? `Saved: ${lastSaved.toLocaleTimeString()}` : "Unsaved changes"}
         </span>
