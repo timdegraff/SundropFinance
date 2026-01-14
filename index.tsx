@@ -1,4 +1,4 @@
-// Sync update: v27.25 - Consolidated Bundle
+// Sync update: v27.26 - Tier Ordering Fix
 import React, { useState, useEffect, useMemo } from "react";
 import ReactDOM from "react-dom/client";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
@@ -19,7 +19,7 @@ export interface LineItem {
 }
 
 export interface TuitionTier {
-  id: 'tuitionFT' | 'tuition4Day' | 'tuition3Day' | 'tuition2Day' | 'tuition1Day' | 'tuitionHalfDay';
+  id: string;
   label: string;
   price: number;
   qty: number;
@@ -49,6 +49,8 @@ export const CARDS = {
     BUDGET: 'budget',
     MONTHLY: 'monthly'
 };
+
+const TIER_ORDER = ['tuitionFT', 'tuition4Day', 'tuition3Day', 'tuition2Day', 'tuition1Day', 'tuitionHalfDay'];
 
 // ==========================================
 // CONSTANTS
@@ -187,7 +189,7 @@ export const loadState = async (): Promise<FinancialState | null> => {
 };
 
 export const subscribeToState = (callback: (state: FinancialState) => void) => {
-    return onSnapshot(doc(doc(db, "plans", DOC_ID)), (doc) => {
+    return onSnapshot(doc(db, "plans", DOC_ID), (doc) => {
         if (doc.exists()) {
              const data = doc.data() as FinancialState;
              const merged = {
@@ -215,7 +217,9 @@ export const calculateFinancials = (state: FinancialState) => {
   let totalTuitionGross = 0;
   let totalHeadcount = 0;
 
-  const tiers = Object.values(state.tuition.tiers).map((tier: TuitionTier) => {
+  // Use explicit TIER_ORDER to ensure grid sequence
+  const tiers = TIER_ORDER.map((id) => {
+    const tier = state.tuition.tiers[id] || INITIAL_STATE.tuition.tiers[id];
     const calculatedPrice = state.tuition.baseFTPrice * (tier.ratio / 100);
     const gross = calculatedPrice * tier.qty;
     totalTuitionGross += gross;
@@ -275,16 +279,6 @@ export const calculateFinancials = (state: FinancialState) => {
 // ==========================================
 
 // Icons
-export const PDFIcon = ({ className }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-    <polyline points="14 2 14 8 20 8"></polyline>
-    <line x1="16" y1="13" x2="8" y2="13"></line>
-    <line x1="16" y1="17" x2="8" y2="17"></line>
-    <polyline points="10 9 9 9 8 9"></polyline>
-  </svg>
-);
-
 export const LogoutIcon = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -304,13 +298,6 @@ export const SunIcon = ({ className }: { className?: string }) => (
     <line x1="21" y1="12" x2="23" y2="12"></line>
     <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
     <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-  </svg>
-);
-
-export const TrendingUpIcon = ({ className }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
-    <polyline points="17 6 23 6 23 12"></polyline>
   </svg>
 );
 
@@ -761,7 +748,7 @@ export default function App() {
 
       <footer className="fixed bottom-0 left-0 w-full bg-slate-950/90 backdrop-blur-xl border-t border-slate-900 py-3 px-6 text-[9px] font-black text-slate-600 flex justify-between tracking-[0.2em] uppercase z-40 no-print">
         <div className="flex items-center gap-4">
-            <span className="text-slate-500">Sundrop Finance v27.24</span>
+            <span className="text-slate-500">Sundrop Finance v27.26</span>
             <span className="text-teal-900">SYSTEM READY</span>
         </div>
         <div className="flex gap-4">
