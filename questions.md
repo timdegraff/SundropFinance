@@ -1,4 +1,4 @@
-<!-- Sync update: v27.9 - Strategy engine refinement -->
+<!-- Sync update: v27.10 - Bump -->
 # 10 Questions to Perfect Sundrop Finance
 
 Here is the implementation of the FY27 Strategic Planner. To refine it further, I have the following questions based on your specification:

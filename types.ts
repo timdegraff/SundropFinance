@@ -1,10 +1,11 @@
-// Sync update: v27.9 - Strategy engine refinement
+// Sync update: v27.12 - Types Update
 export interface LineItem {
   id: string;
   label: string;
   baseline: number;
   modifierPercent: number;
   modifierFixed: number;
+  finalValue?: number; // Added to support overrides from calculation engine
 }
 
 export interface TuitionTier {

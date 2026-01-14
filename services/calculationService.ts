@@ -1,4 +1,4 @@
-// Sync update: v27.9 - Strategy engine refinement
+// Sync update: v27.13 - Discount Logic Update
 import { FinancialState, LineItem, TuitionTier, DiscountTier } from "../types.ts";
 
 export const calculateItemTotal = (item: LineItem): number => {
@@ -22,14 +22,12 @@ export const calculateFinancials = (state: FinancialState) => {
   });
 
   // 2. Calculate Discounts
-  // Logic: (TotalQty * AvgPrice) * (Discount% * Count) ??
-  // Better Logic based on spec interpretation:
-  // We need an "Average Price Per Head" to apply the discount % against.
-  const avgPricePerHead = totalHeadcount > 0 ? totalTuitionGross / totalHeadcount : 0;
+  // Logic update: Discounts are applied to the Full-Time price base, not average.
+  // Formula: (BaseFTPrice * (Discount% / 100)) * Qty
   
   let totalDiscounts = 0;
   const processedDiscounts = Object.values(state.discounts).map((disc: DiscountTier) => {
-    const discountValue = (avgPricePerHead * (disc.discountPercent / 100)) * disc.qty;
+    const discountValue = (state.tuition.baseFTPrice * (disc.discountPercent / 100)) * disc.qty;
     totalDiscounts += discountValue;
     return { ...disc, discountValue };
   });

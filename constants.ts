@@ -1,4 +1,4 @@
-// Sync update: v27.9 - Strategy engine refinement
+// Sync update: v27.16 - Initial Counts Updated
 import { LineItem, FinancialState } from "./types.ts";
 
 export const BASELINE_BUDGET: LineItem[] = [
@@ -25,7 +25,7 @@ export const BASELINE_BUDGET: LineItem[] = [
   { id: 'b_marketing', label: '101-900 Advertising & Marketing', baseline: 200, modifierPercent: 0, modifierFixed: 0 },
   { id: 'b_repairs', label: '101-930 Repairs & Maintenance', baseline: 500, modifierPercent: 0, modifierFixed: 0 },
   { id: 'b_rent', label: '101-904 Rent', baseline: 13200, modifierPercent: 0, modifierFixed: 0 },
-  { id: 'b_capital', label: '101-971 Capital Outlay', baseline: 25000, modifierPercent: 0, modifierFixed: 0 },
+  { id: 'b_capital', label: '101-971 Capital Outlay', baseline: 25000, modifierPercent: -100, modifierFixed: 0 },
   { id: 'b_misc', label: '101-998 Miscellaneous Expense', baseline: 0, modifierPercent: 0, modifierFixed: 0 },
 ];
 
@@ -49,17 +49,17 @@ export const INITIAL_STATE: FinancialState = {
   tuition: {
     baseFTPrice: 7520,
     tiers: {
-      tuitionFT: { id: 'tuitionFT', label: 'Full-Time (5 Days)', price: 7520, qty: 30, ratio: 100 },
-      tuition4Day: { id: 'tuition4Day', label: '4-Day Tier', price: 6016, qty: 4, ratio: 80 },
-      tuition3Day: { id: 'tuition3Day', label: '3-Day Tier', price: 4512, qty: 5, ratio: 60 },
-      tuition2Day: { id: 'tuition2Day', label: '2-Day Tier', price: 3008, qty: 0, ratio: 40 },
-      tuition1Day: { id: 'tuition1Day', label: '1-Day Tier', price: 1504, qty: 0, ratio: 20 },
-      tuitionHalfDay: { id: 'tuitionHalfDay', label: 'Half-Day (5 Days)', price: 3760, qty: 4, ratio: 50 },
+      tuitionFT: { id: 'tuitionFT', label: 'Full-Time (5 Days)', price: 7520, qty: 18, ratio: 100 },
+      tuition4Day: { id: 'tuition4Day', label: '4-Day Tier', price: 6016, qty: 7, ratio: 80 },
+      tuition3Day: { id: 'tuition3Day', label: '3-Day Tier', price: 4512, qty: 4, ratio: 60 },
+      tuition2Day: { id: 'tuition2Day', label: '2-Day Tier', price: 3008, qty: 7, ratio: 40 },
+      tuition1Day: { id: 'tuition1Day', label: '1-Day Tier', price: 1504, qty: 5, ratio: 20 },
+      tuitionHalfDay: { id: 'tuitionHalfDay', label: 'Half-Day (5 Days)', price: 3760, qty: 2, ratio: 50 },
     }
   },
   discounts: {
     staff: { id: 'staff', label: 'Staff Discount', qty: 2, discountPercent: 50 },
-    sibling: { id: 'sibling', label: 'Sibling Discount', qty: 8, discountPercent: 5 },
+    sibling: { id: 'sibling', label: 'Sibling Discount', qty: 9, discountPercent: 5 },
     early: { id: 'early', label: 'Early Bird', qty: 12, discountPercent: 5 },
   },
   revenueItems: BASELINE_REVENUE,
