@@ -6,9 +6,10 @@
     <title>Sundrop Finance FY27</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #0a0f1d; color: #e2e8f0; }
+        * { font-family: 'Inter', sans-serif !important; }
+        body { background-color: #0a0f1d; color: #e2e8f0; }
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
@@ -21,9 +22,18 @@
         }
 
         @media print {
+            body { background: white !important; color: black !important; padding: 0 !important; margin: 0 !important; }
             .no-print { display: none !important; }
-            body { background-color: white !important; color: black !important; }
-            .glass-panel { background: white !important; border: none !important; }
+            .print-section { display: block !important; page-break-after: auto; visibility: visible !important; position: static !important; }
+            .glass-panel { background: white !important; border: none !important; backdrop-filter: none !important; }
+            .recharts-responsive-container { page-break-inside: avoid; }
+            input { border: none !important; background: transparent !important; color: black !important; }
+            table { border: 1px solid #ddd !important; }
+            th { background: #f8fafc !important; color: #475569 !important; }
+            .bg-slate-900, .bg-slate-950, .bg-slate-900\/40 { background: #fff !important; border: 1px solid #eee !important; color: #000 !important; }
+            .text-white { color: #000 !important; }
+            .text-slate-500, .text-slate-400 { color: #666 !important; }
+            .border-slate-800 { border-color: #eee !important; }
         }
     </style>
 <script type="importmap">
