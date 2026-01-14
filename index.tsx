@@ -1,9 +1,9 @@
-// Sync update: FY27.1 - UI Refinement & Auth Flow Optimization
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+// Sync update: v27.10 - Bump
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import ReactDOM from "react-dom/client";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, doc, setDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 // --- CONFIG & DATA ---
@@ -105,14 +105,8 @@ const Icons = {
   Logout: ({ className = "" }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
   ),
-  PDF: ({ className = "" }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-  ),
   Trash: ({ className = "" }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
-  ),
-  TrendingUp: ({ className = "" }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
   )
 };
 
@@ -227,8 +221,13 @@ function App() {
   const [state, setState] = useState(INITIAL_STATE);
   const [activeTab, setActiveTab] = useState('strategy');
   const [lastSaved, setLastSaved] = useState(null);
+  
+  // Ref to prevent "saving initial state over actual data" before first load
+  const hasInitialized = useRef(false);
+  // Ref to prevent update loops when server data arrives
+  const isUpdatingFromFirebase = useRef(false);
 
-  // Auth Handler with prompt forced
+  // Auth Handlers
   const handleLogin = async () => {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
@@ -238,7 +237,7 @@ function App() {
         setUser(result.user);
       } else {
         await signOut(auth);
-        alert("Access Denied.");
+        alert(`Account ${result.user.email} is not authorized for finance access.`);
       }
     } catch (e) {
       console.error("Login failed", e);
@@ -248,6 +247,8 @@ function App() {
   const handleLogout = async () => {
     await signOut(auth);
     setUser(null);
+    hasInitialized.current = false;
+    setState(INITIAL_STATE);
   };
 
   // Monitor Auth State
@@ -265,27 +266,38 @@ function App() {
   // Listen for Data
   useEffect(() => {
     if (!user) return;
+    
     const unsubscribe = onSnapshot(doc(db, "plans", DOC_ID), (snap) => {
       if (snap.exists()) {
-        setState(prev => ({ ...prev, ...snap.data() }));
+        const remoteData = snap.data();
+        isUpdatingFromFirebase.current = true;
+        setState(remoteData);
+        setLastSaved(new Date());
+        hasInitialized.current = true;
+        setTimeout(() => { isUpdatingFromFirebase.current = false; }, 100);
+      } else {
+        // Doc doesn't exist yet, we can now safely allow saving our baseline
+        hasInitialized.current = true;
       }
     }, (error) => {
-      console.warn("Snapshot listener error (likely permissions):", error.message);
+      console.warn("Snapshot error:", error.message);
     });
     return () => unsubscribe();
   }, [user]);
 
   // Debounced Auto-Save
   useEffect(() => {
-    if (!user) return;
+    // ONLY save if we have a user AND we have successfully fetched the existing data (or confirmed it's empty)
+    if (!user || isUpdatingFromFirebase.current || !hasInitialized.current) return;
+    
     const timer = setTimeout(async () => {
       try {
         await setDoc(doc(db, "plans", DOC_ID), state);
-        setLastSaved(new Date());
+        console.log("Synced to Firebase at", new Date().toLocaleTimeString());
       } catch (e) {
-        console.warn("Save sync delay...");
+        console.warn("Save sync error:", e.message);
       }
-    }, 2000);
+    }, 1000); // Faster debounce for snappier saves
     return () => clearTimeout(timer);
   }, [state, user]);
 
@@ -373,7 +385,6 @@ function App() {
       { name: 'Other', value: other }
     ].filter(v => v.value > 0);
 
-    // Sort descending for legend and starting largest at 12 o'clock
     return raw.sort((a, b) => b.value - a.value);
   }, [financials]);
 
