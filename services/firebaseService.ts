@@ -1,3 +1,4 @@
+// Sync update: v27.9 - Strategy engine refinement
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -63,7 +64,7 @@ export const loadState = async (): Promise<FinancialState | null> => {
 
 // Real-time listener
 export const subscribeToState = (callback: (state: FinancialState) => void) => {
-    return onSnapshot(doc(db, "plans", DOC_ID), (doc) => {
+    return onSnapshot(doc(doc(db, "plans", DOC_ID)), (doc) => {
         if (doc.exists()) {
              const data = doc.data() as FinancialState;
              const merged = {

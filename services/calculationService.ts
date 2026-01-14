@@ -1,3 +1,4 @@
+// Sync update: v27.9 - Strategy engine refinement
 import { FinancialState, LineItem, TuitionTier, DiscountTier } from "../types.ts";
 
 export const calculateItemTotal = (item: LineItem): number => {

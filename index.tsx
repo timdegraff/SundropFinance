@@ -1,3 +1,4 @@
+// Sync update: FY27.1 - UI Refinement & Auth Flow Optimization
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import ReactDOM from "react-dom/client";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
@@ -18,7 +19,7 @@ const FIREBASE_CONFIG = {
 
 const ALLOWED_EMAILS = ["degraff.tim@gmail.com", "mariahfrye@gmail.com", "watterstj1@gmail.com"];
 const DOC_ID = "fy27_master_plan";
-const COLORS = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6'];
+const COLORS = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#6366f1', '#ec4899'];
 
 const BASELINE_BUDGET = [
   { id: 'b_salaries', label: '101-702 Salaries & Wages', baseline: 190000, modifierPercent: 0, modifierFixed: 0 },
@@ -227,13 +228,34 @@ function App() {
   const [activeTab, setActiveTab] = useState('strategy');
   const [lastSaved, setLastSaved] = useState(null);
 
+  // Auth Handler with prompt forced
+  const handleLogin = async () => {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    try {
+      const result = await signInWithPopup(auth, provider);
+      if (ALLOWED_EMAILS.includes(result.user.email)) {
+        setUser(result.user);
+      } else {
+        await signOut(auth);
+        alert("Access Denied.");
+      }
+    } catch (e) {
+      console.error("Login failed", e);
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    setUser(null);
+  };
+
   // Monitor Auth State
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       if (u && ALLOWED_EMAILS.includes(u.email)) {
         setUser(u);
-      } else if (u) {
-        signOut(auth);
+      } else {
         setUser(null);
       }
     });
@@ -287,11 +309,16 @@ function App() {
     let grossTuition = 0;
     let students = 0;
     
+    let ftGross = 0;
+    let ptGross = 0;
+
     const tiers = Object.values(state.tuition.tiers).map(t => {
       const price = basePrice * (t.ratio / 100);
       const gross = price * t.qty;
       grossTuition += gross;
       students += t.qty;
+      if (t.id === 'tuitionFT') ftGross = gross;
+      else ptGross += gross;
       return { ...t, price, gross };
     });
 
@@ -305,6 +332,10 @@ function App() {
 
     const netTuition = grossTuition - totalDiscounts;
     
+    // Proportional split of net tuition for chart
+    const ftNet = grossTuition > 0 ? ftGross - (totalDiscounts * (ftGross / grossTuition)) : 0;
+    const ptNet = grossTuition > 0 ? ptGross - (totalDiscounts * (ptGross / grossTuition)) : 0;
+
     let totalRev = 0;
     const revItems = state.revenueItems.map(i => {
       const val = i.id === 'tuition' ? netTuition : calculateItemTotal(i);
@@ -322,20 +353,28 @@ function App() {
     const netMargin = totalRev - totalExp;
     const marginPct = totalRev > 0 ? (netMargin / totalRev) * 100 : 0;
 
-    return { tiers, discounts, revItems, expItems, totalRev, totalExp, students, netTuition, totalDiscounts, netMargin, marginPct };
+    return { tiers, discounts, revItems, expItems, totalRev, totalExp, students, netTuition, ftNet, ptNet, totalDiscounts, netMargin, marginPct };
   }, [state]);
 
   const pieData = useMemo(() => {
-    const ft = financials.tiers.find(t => t.id === 'tuitionFT')?.gross || 0;
-    const pt = financials.tiers.filter(t => t.id !== 'tuitionFT').reduce((s, t) => s + t.gross, 0);
     const as = financials.revItems.find(i => i.id === 'r_afterschool')?.finalValue || 0;
-    const other = financials.totalRev - ft - pt - as;
-    return [
-      { name: 'Net Tuition', value: ft + pt },
-      { name: 'Grants & State', value: financials.revItems.filter(i => i.id.startsWith('r_oia') || i.id.startsWith('r_state') || i.id.startsWith('r_local')).reduce((s,i) => s + i.finalValue, 0) },
+    const grants = financials.revItems.filter(i => i.id.startsWith('r_oia') || i.id.startsWith('r_state') || i.id.startsWith('r_local')).reduce((s,i) => s + i.finalValue, 0);
+    const totalRevCalculated = financials.totalRev;
+    
+    const ft = financials.ftNet;
+    const pt = financials.ptNet;
+    const other = totalRevCalculated - ft - pt - as - grants;
+
+    const raw = [
+      { name: 'Full-Time Tuition', value: ft },
+      { name: 'Part-Time Tuition', value: pt },
+      { name: 'Grants & State', value: grants },
       { name: 'Afterschool', value: as },
       { name: 'Other', value: other }
     ].filter(v => v.value > 0);
+
+    // Sort descending for legend and starting largest at 12 o'clock
+    return raw.sort((a, b) => b.value - a.value);
   }, [financials]);
 
   // LOGIN SCREEN
@@ -353,7 +392,7 @@ function App() {
           <p className="text-center text-slate-400 mb-8 text-sm font-black tracking-widest uppercase">Authorized Access Only</p>
           <div className="space-y-4">
             <button 
-                onClick={() => signInWithPopup(auth, new GoogleAuthProvider())}
+                onClick={handleLogin}
                 className="w-full bg-white text-slate-900 font-black py-3 rounded-lg transition-transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3"
             >
               Sign in with Google
@@ -396,7 +435,7 @@ function App() {
                  <p className="text-[10px] font-black text-white leading-none truncate max-w-[120px]">{user.email}</p>
                  <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-0.5">Admin Access</p>
               </div>
-              <button onClick={() => signOut(auth)} title="Logout" className="w-8 h-8 rounded-full flex items-center justify-center bg-slate-950 border border-slate-800 text-slate-500 hover:text-rose-500 transition-all active:scale-95">
+              <button onClick={handleLogout} title="Logout" className="w-8 h-8 rounded-full flex items-center justify-center bg-slate-950 border border-slate-800 text-slate-500 hover:text-rose-500 transition-all active:scale-95">
                  <Icons.Logout />
               </button>
               <img src={user.photoURL} alt="User" className="w-8 h-8 rounded-full border border-amber-500/50 shadow-lg" />
@@ -408,10 +447,11 @@ function App() {
         {/* Strategy Tab */}
         <div className={`${activeTab === 'strategy' ? 'block' : 'hidden'} print:block space-y-6`}>
           {/* KPI ROW */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             {[
-              { label: 'Students', val: financials.students, color: 'text-white' },
+              { label: 'LEARNERS', val: financials.students, color: 'text-white' },
               { label: 'Net Tuition', val: `$${Math.round(financials.netTuition / 1000)}K`, color: 'text-amber-500' },
+              { label: 'Total Revenue', val: `$${Math.round(financials.totalRev / 1000)}K`, color: 'text-teal-400' },
               { label: 'Total Exp', val: `$${Math.round(financials.totalExp / 1000)}K`, color: 'text-rose-500' },
               { label: 'Margin %', val: `${financials.marginPct.toFixed(1)}%`, color: 'text-teal-400' }
             ].map((kpi, i) => (
@@ -456,7 +496,7 @@ function App() {
                                     type="number" 
                                     value={t.ratio} 
                                     onChange={(e) => setState(s => ({...s, tuition: {...s.tuition, tiers: {...s.tuition.tiers, [t.id]: {...t, ratio: parseFloat(e.target.value) || 0}} }}))}
-                                    className="w-10 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-[10px] font-black text-amber-500 text-center outline-none"
+                                    className="w-24 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-[10px] font-black text-amber-500 text-center outline-none"
                                 />
                                 <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">% Ratio</span>
                             </div>
@@ -484,11 +524,11 @@ function App() {
                       <div className="flex justify-between items-center border-y border-slate-800/50 py-2">
                         <div className="text-center">
                           <div className="text-[8px] text-slate-600 font-bold uppercase mb-0.5">Students</div>
-                          <input type="number" value={d.qty} onChange={(e) => setState(s => ({...s, discounts: {...s.discounts, [d.id]: {...d, qty: parseInt(e.target.value) || 0}} }))} className="bg-slate-900 border border-slate-800 w-8 text-center rounded text-[10px] font-black p-0.5" />
+                          <input type="number" value={d.qty} onChange={(e) => setState(s => ({...s, discounts: {...s.discounts, [d.id]: {...d, qty: parseInt(e.target.value) || 0}} }))} className="bg-slate-900 border border-slate-800 w-[72px] text-center rounded text-[10px] font-black p-0.5" />
                         </div>
                         <div className="text-center">
                           <div className="text-[8px] text-slate-600 font-bold uppercase mb-0.5">Disc %</div>
-                          <input type="number" value={d.discountPercent} onChange={(e) => setState(s => ({...s, discounts: {...s.discounts, [d.id]: {...d, discountPercent: parseFloat(e.target.value) || 0}} }))} className="bg-slate-900 border border-slate-800 w-8 text-center rounded text-[10px] font-black p-0.5" />
+                          <input type="number" value={d.discountPercent} onChange={(e) => setState(s => ({...s, discounts: {...s.discounts, [d.id]: {...d, discountPercent: parseFloat(e.target.value) || 0}} }))} className="bg-slate-900 border border-slate-800 w-[72px] text-center rounded text-[10px] font-black p-0.5" />
                         </div>
                       </div>
                       <div className="text-right">
@@ -511,7 +551,19 @@ function App() {
                   <div className="relative h-[200px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={0} dataKey="value" stroke="#0a0f1d" strokeWidth={4}>
+                        <Pie 
+                          data={pieData} 
+                          cx="50%" 
+                          cy="50%" 
+                          innerRadius={60} 
+                          outerRadius={80} 
+                          paddingAngle={0} 
+                          dataKey="value" 
+                          stroke="#ffffff" 
+                          strokeWidth={0.5} 
+                          startAngle={90} 
+                          endAngle={-270}
+                        >
                           {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                         </Pie>
                         <Tooltip contentStyle={{background: '#0a0f1d', border: '1px solid #1e293b', borderRadius: '12px', fontSize: '10px'}} />
@@ -565,10 +617,10 @@ function App() {
 
       <footer className="fixed bottom-0 left-0 w-full bg-slate-950/90 backdrop-blur-xl border-t border-slate-900 py-3 px-6 text-[9px] font-black text-slate-600 flex justify-between tracking-[0.2em] uppercase z-40 print:hidden">
         <div className="flex items-center gap-4">
-            <span className="text-slate-500">Sundrop Finance v27.8</span>
+            <span className="text-slate-500">FY27.1</span>
             <span className="text-teal-900">SYSTEM READY</span>
         </div>
-        <span>{lastSaved ? `SYNCED: ${lastSaved.toLocaleTimeString()}` : 'CONNECTING...'}</span>
+        <span>{user ? `CONNECTED: ${lastSaved ? lastSaved.toLocaleTimeString() : 'SYNCING...'}` : 'OFFLINE'}</span>
       </footer>
     </div>
   );

@@ -1,4 +1,4 @@
-
+// Sync update: v27.9 - Strategy engine refinement
 import React from "react";
 import { LineItem } from "../types.ts";
 import { calculateItemTotal } from "../services/calculationService.ts";

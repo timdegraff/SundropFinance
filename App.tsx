@@ -1,3 +1,4 @@
+// Sync update: v27.9 - Strategy engine refinement
 import React, { useState, useEffect, useMemo } from "react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { SunIcon, TrendingUpIcon, PDFIcon, LogoutIcon } from "./components/Icons.tsx";
@@ -100,7 +101,7 @@ export default function App() {
         <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-rose-500"></div>
           <div className="flex justify-center mb-6"><SunIcon className="w-16 h-16 text-amber-500" /></div>
-          <h1 className="text-2xl font-black text-center text-white mb-2 tracking-tight">SUNDROP FINANCE</h1>
+          <h1 className="text-2xl font-black text-center text-white mb-2 tracking-tight uppercase">SUNDROP FINANCE</h1>
           <p className="text-center text-slate-400 mb-8 text-sm uppercase tracking-widest font-black">Authorized Access Only</p>
           <button onClick={handleLogin} className="w-full bg-white text-slate-900 font-black py-3 rounded-lg flex items-center justify-center gap-3 hover:bg-slate-100 transition-all">Sign in with Google</button>
           {authError && <p className="text-rose-500 text-xs text-center mt-4 font-bold">{authError}</p>}
@@ -184,8 +185,8 @@ export default function App() {
                       </div>
                     </div>
                     <div className="text-right w-full md:w-auto">
-                      <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-0.5">Monthly Approx</p>
-                      <p className="text-2xl font-black text-white">${Math.round(state.tuition.baseFTPrice/10).toLocaleString()}</p>
+                      <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-0.5">TOTAL LEARNERS</p>
+                      <p className="text-2xl font-black text-white">{financials.totalHeadcount}</p>
                     </div>
                   </div>
 
@@ -299,7 +300,7 @@ export default function App() {
 
       <footer className="fixed bottom-0 left-0 w-full bg-slate-950/90 backdrop-blur-xl border-t border-slate-900 py-3 px-6 text-[9px] font-black text-slate-600 flex justify-between tracking-[0.2em] uppercase z-40 no-print">
         <div className="flex items-center gap-4">
-            <span className="text-slate-500">Sundrop Finance v27.7</span>
+            <span className="text-slate-500">Sundrop Finance v27.9</span>
             <span className="text-teal-900">SYSTEM READY</span>
         </div>
         <span>{lastSaved ? `SYNCED: ${lastSaved.toLocaleTimeString()}` : "CONNECTING..."}</span>

@@ -1,4 +1,4 @@
-
+// Sync update: v27.9 - Strategy engine refinement
 import { LineItem, FinancialState } from "./types.ts";
 
 export const BASELINE_BUDGET: LineItem[] = [

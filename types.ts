@@ -1,3 +1,4 @@
+// Sync update: v27.9 - Strategy engine refinement
 export interface LineItem {
   id: string;
   label: string;
