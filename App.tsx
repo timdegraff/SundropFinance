@@ -1,4 +1,4 @@
-// Sync update: v27.22 - Compact Spacing
+// Sync update: v27.24 - Guest Mode Removed
 import React, { useState, useEffect, useMemo } from "react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { SunIcon, TrendingUpIcon, PDFIcon, LogoutIcon } from "./components/Icons.tsx";
@@ -13,15 +13,12 @@ const ALLOWED_EMAILS = ["degraff.tim@gmail.com", "mariahfrye@gmail.com", "watter
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
-  const [isGuest, setIsGuest] = useState(false);
   const [authError, setAuthError] = useState("");
   const [activeTab, setActiveTab] = useState(CARDS.STRATEGY);
   const [state, setState] = useState<FinancialState>(INITIAL_STATE);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   useEffect(() => {
-    if (isGuest) return; // Skip Firebase for guest
-
     if (user && ALLOWED_EMAILS.includes(user.email)) {
         loadState().then(data => { if (data) setState(data); });
         try {
@@ -34,11 +31,10 @@ export default function App() {
           console.error("Firebase subscription failed", e);
         }
     }
-  }, [user, isGuest]);
+  }, [user]);
 
   // Debounced auto-save
   useEffect(() => {
-    if (isGuest) return; // Skip Autosave for guest
     if (!user || !ALLOWED_EMAILS.includes(user.email)) return;
     
     const timer = setTimeout(() => {
@@ -46,7 +42,7 @@ export default function App() {
       setLastSaved(new Date());
     }, 2000);
     return () => clearTimeout(timer);
-  }, [state, user, isGuest]);
+  }, [state, user]);
 
   const handleLogin = async () => {
     const googleUser = await loginWithGoogle();
@@ -58,25 +54,13 @@ export default function App() {
             return; 
         }
         setUser(googleUser);
-        setIsGuest(false);
         setAuthError("");
     }
   };
 
-  const handleGuestLogin = () => {
-    setUser({ 
-        email: "guest@sundrop.local", 
-        photoURL: "https://api.dicebear.com/7.x/shapes/svg?seed=guest",
-        displayName: "Guest User"
-    });
-    setIsGuest(true);
-    setAuthError("");
-  };
-
   const handleLogout = async () => {
-    if (!isGuest) await logout();
+    await logout();
     setUser(null);
-    setIsGuest(false);
     setState(INITIAL_STATE); // Reset state on logout
   };
 
@@ -136,10 +120,6 @@ export default function App() {
              Sign in with Google
           </button>
           
-          <button onClick={handleGuestLogin} className="w-full bg-transparent border border-slate-700 text-slate-400 font-black py-3 rounded-lg flex items-center justify-center gap-3 hover:border-slate-500 hover:text-white transition-all text-xs uppercase tracking-widest">
-             Preview as Guest (Offline)
-          </button>
-
           {authError && <p className="text-rose-500 text-xs text-center mt-4 font-bold">{authError}</p>}
         </div>
       </div>
@@ -178,10 +158,10 @@ export default function App() {
            <div className="flex items-center gap-3 bg-slate-900/50 rounded-full pl-4 pr-1.5 py-1.5 border border-slate-800/50">
               <div className="text-right hidden sm:block">
                  <p className="text-[10px] font-black text-white leading-none truncate max-w-[120px]">
-                    {isGuest ? "GUEST PREVIEW" : user.email}
+                    {user.email}
                  </p>
                  <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-0.5">
-                    {isGuest ? "READ ONLY" : "ADMINISTRATOR"}
+                    ADMINISTRATOR
                  </p>
               </div>
               <button onClick={handleLogout} className="w-8 h-8 rounded-full flex items-center justify-center bg-slate-950 border border-slate-800 text-slate-500 hover:text-rose-500 transition-all active:scale-95">
@@ -354,12 +334,11 @@ export default function App() {
 
       <footer className="fixed bottom-0 left-0 w-full bg-slate-950/90 backdrop-blur-xl border-t border-slate-900 py-3 px-6 text-[9px] font-black text-slate-600 flex justify-between tracking-[0.2em] uppercase z-40 no-print">
         <div className="flex items-center gap-4">
-            <span className="text-slate-500">Sundrop Finance v27.15</span>
+            <span className="text-slate-500">Sundrop Finance v27.24</span>
             <span className="text-teal-900">SYSTEM READY</span>
         </div>
         <div className="flex gap-4">
-            {isGuest && <span className="text-amber-500">GUEST MODE - CHANGES NOT SAVED</span>}
-            <span>{lastSaved ? `SYNCED: ${lastSaved.toLocaleTimeString()}` : (isGuest ? "OFFLINE" : "CONNECTING...")}</span>
+            <span>{lastSaved ? `SYNCED: ${lastSaved.toLocaleTimeString()}` : "CONNECTING..."}</span>
         </div>
       </footer>
     </div>
