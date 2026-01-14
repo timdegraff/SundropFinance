@@ -71,6 +71,8 @@ const INITIAL_STATE = {
       tuitionFT: { id: 'tuitionFT', label: 'Full-Time (5 Days)', qty: 30, ratio: 100 },
       tuition4Day: { id: 'tuition4Day', label: '4-Day Tier', qty: 4, ratio: 80 },
       tuition3Day: { id: 'tuition3Day', label: '3-Day Tier', qty: 5, ratio: 60 },
+      tuition2Day: { id: 'tuition2Day', label: '2-Day Tier', qty: 0, ratio: 40 },
+      tuition1Day: { id: 'tuition1Day', label: '1-Day Tier', qty: 0, ratio: 20 },
       tuitionHalfDay: { id: 'tuitionHalfDay', label: 'Half-Day (5 Days)', qty: 4, ratio: 50 },
     }
   },
@@ -98,6 +100,9 @@ const calculateItemTotal = (item) => {
 const Icons = {
   Sun: ({ className = "" }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+  ),
+  Logout: ({ className = "" }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
   ),
   PDF: ({ className = "" }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
@@ -242,6 +247,8 @@ function App() {
       if (snap.exists()) {
         setState(prev => ({ ...prev, ...snap.data() }));
       }
+    }, (error) => {
+      console.warn("Snapshot listener error (likely permissions):", error.message);
     });
     return () => unsubscribe();
   }, [user]);
@@ -342,12 +349,12 @@ function App() {
                <Icons.Sun className="w-8 h-8 text-amber-500" />
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-center text-white mb-2 tracking-tight">Sundrop Finance</h1>
-          <p className="text-center text-slate-400 mb-8 text-sm">Strategic Planning & Forecasting FY27</p>
+          <h1 className="text-2xl font-black text-center text-white mb-2 tracking-tight uppercase">SUNDROP FINANCE</h1>
+          <p className="text-center text-slate-400 mb-8 text-sm font-black tracking-widest uppercase">Authorized Access Only</p>
           <div className="space-y-4">
             <button 
                 onClick={() => signInWithPopup(auth, new GoogleAuthProvider())}
-                className="w-full bg-white text-slate-900 font-bold py-3 rounded-lg transition-transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3"
+                className="w-full bg-white text-slate-900 font-black py-3 rounded-lg transition-transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3"
             >
               Sign in with Google
             </button>
@@ -363,7 +370,7 @@ function App() {
       <header className="sticky top-0 z-50 glass-panel border-b border-slate-800/50 px-6 h-16 flex items-center justify-between print:hidden">
         <div className="flex items-center gap-3">
           <div className="p-1.5 bg-amber-500 rounded text-black shadow-lg shadow-amber-500/20"><Icons.Sun className="w-5 h-5" /></div>
-          <span className="text-lg font-black text-white uppercase tracking-tighter hidden md:inline">Sun Drop <span className="text-amber-500">FINANCE</span></span>
+          <span className="text-lg font-black text-white uppercase tracking-tighter hidden md:inline">SUNDROP <span className="text-amber-500">FINANCE</span></span>
         </div>
         <nav className="flex gap-1 bg-slate-950 rounded-full p-1 border border-slate-800">
           {[
@@ -377,90 +384,88 @@ function App() {
             </button>
           ))}
         </nav>
-        <div className="flex items-center gap-6">
-           <div className="text-right hidden sm:block">
+        <div className="flex items-center gap-4">
+           <div className="text-right hidden xl:block">
               <div className="text-[9px] font-black uppercase text-slate-500 tracking-[0.2em] leading-none mb-1">Net Margin</div>
               <div className={`text-xl font-black leading-none ${financials.netMargin >= 0 ? 'text-teal-400' : 'text-rose-500'}`}>
                 {financials.netMargin >= 0 ? '+' : ''}${Math.round(financials.netMargin).toLocaleString()}
               </div>
            </div>
-           <button onClick={() => window.print()} className="w-10 h-10 rounded-lg flex items-center justify-center bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-all shadow-lg active:scale-95">
-              <Icons.PDF />
-           </button>
+           <div className="flex items-center gap-3 bg-slate-900/50 rounded-full pl-4 pr-1.5 py-1.5 border border-slate-800/50">
+              <div className="text-right hidden sm:block">
+                 <p className="text-[10px] font-black text-white leading-none truncate max-w-[120px]">{user.email}</p>
+                 <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-0.5">Admin Access</p>
+              </div>
+              <button onClick={() => signOut(auth)} title="Logout" className="w-8 h-8 rounded-full flex items-center justify-center bg-slate-950 border border-slate-800 text-slate-500 hover:text-rose-500 transition-all active:scale-95">
+                 <Icons.Logout />
+              </button>
+              <img src={user.photoURL} alt="User" className="w-8 h-8 rounded-full border border-amber-500/50 shadow-lg" />
+           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto p-4 md:p-8 space-y-10">
-        
-        {/* PRINT ONLY: SEQUENCE ALL SECTIONS */}
-        <div className="hidden print:block space-y-20">
-            <h1 className="text-3xl font-black text-slate-900 uppercase border-b-4 border-amber-500 pb-2 mb-10">FY27 Strategic Financial Plan</h1>
-            <div className="grid grid-cols-4 gap-4 mb-10">
-                <div className="p-4 bg-slate-100 rounded">Students: {financials.students}</div>
-                <div className="p-4 bg-slate-100 rounded font-bold">Net Tuition: ${Math.round(financials.netTuition).toLocaleString()}</div>
-                <div className="p-4 bg-slate-100 rounded">Total Exp: ${Math.round(financials.totalExp).toLocaleString()}</div>
-                <div className="p-4 bg-slate-100 rounded">Margin: {financials.marginPct.toFixed(1)}%</div>
-            </div>
-        </div>
-
-        {/* Tab 1: STRATEGY */}
-        <div className={`${activeTab === 'strategy' ? 'block' : 'hidden'} print:block space-y-8`}>
+      <main className="max-w-7xl mx-auto px-4 md:px-8 py-4 md:py-6 space-y-6">
+        {/* Strategy Tab */}
+        <div className={`${activeTab === 'strategy' ? 'block' : 'hidden'} print:block space-y-6`}>
           {/* KPI ROW */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { label: 'Students', val: financials.students, color: 'text-white print:text-black' },
-              { label: 'Net Tuition', val: `$${Math.round(financials.netTuition / 1000)}k`, color: 'text-amber-500 print:text-amber-600' },
-              { label: 'Total Exp', val: `$${Math.round(financials.totalExp / 1000)}k`, color: 'text-rose-500 print:text-red-600' },
-              { label: 'Margin %', val: `${financials.marginPct.toFixed(1)}%`, color: 'text-teal-400 print:text-green-700' }
+              { label: 'Students', val: financials.students, color: 'text-white' },
+              { label: 'Net Tuition', val: `$${Math.round(financials.netTuition / 1000)}K`, color: 'text-amber-500' },
+              { label: 'Total Exp', val: `$${Math.round(financials.totalExp / 1000)}K`, color: 'text-rose-500' },
+              { label: 'Margin %', val: `${financials.marginPct.toFixed(1)}%`, color: 'text-teal-400' }
             ].map((kpi, i) => (
-              <div key={i} className="p-4 md:p-6 rounded-2xl bg-slate-900/50 border border-slate-800/60 shadow-xl backdrop-blur print:bg-slate-50 print:border-slate-300">
-                <p className="text-[10px] uppercase font-black text-slate-500 tracking-widest mb-2">{kpi.label}</p>
-                <p className={`text-2xl md:text-3xl font-black ${kpi.color}`}>{kpi.val}</p>
+              <div key={i} className="p-4 rounded-2xl bg-slate-900/40 border border-slate-800/60 shadow-xl backdrop-blur">
+                <p className="text-[9px] uppercase font-black text-slate-500 tracking-widest mb-1">{kpi.label}</p>
+                <p className={`text-xl md:text-2xl font-black ${kpi.color}`}>{kpi.val}</p>
               </div>
             ))}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-            <div className="lg:col-span-2 space-y-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
               {/* TUITION ENGINE */}
-              <section className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-8 relative overflow-hidden shadow-2xl print:bg-white print:border-slate-400">
-                <div className="absolute top-0 right-0 p-8 opacity-[0.03] print:hidden">
-                    <Icons.TrendingUp className="w-32 h-32 text-amber-500" />
-                </div>
-                <div className="flex justify-between items-end border-b border-slate-800/50 pb-6 print:border-slate-300">
-                  <div className="flex items-center">
-                    <div className="w-1.5 h-8 bg-amber-500 mr-4 rounded-full"></div>
-                    <div>
-                      <h2 className="text-xl font-black text-white uppercase tracking-tighter print:text-black">Tuition Engine</h2>
-                      <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Rate Scaling & Scaling</p>
-                    </div>
-                  </div>
+              <section className="bg-slate-900/40 border border-slate-800 rounded-3xl p-5 md:p-6 space-y-6 relative overflow-hidden shadow-2xl">
+                <div className="flex items-center">
+                    <div className="w-1.5 h-6 bg-amber-500 mr-4 rounded-full"></div>
+                    <h2 className="text-lg font-black text-white uppercase tracking-tighter">Tuition Engine</h2>
                 </div>
                 
-                <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row gap-6 items-center justify-between print:bg-slate-50 print:border-slate-300">
+                <div className="bg-slate-950/80 p-4 md:p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row gap-4 items-center justify-between">
                    <div className="flex-1 w-full">
-                      <label className="text-[10px] uppercase font-black text-amber-500 tracking-[0.2em] mb-2 block">Base Full-Time Rate (Yearly)</label>
+                      <label className="text-[9px] uppercase font-black text-amber-500 tracking-[0.2em] mb-1.5 block">Base Full-Time Rate (Yearly)</label>
                       <div className="relative">
                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-2xl font-light">$</span>
-                        <input type="number" value={state.tuition.baseFTPrice} onChange={(e) => setState(s => ({...s, tuition: {...s.tuition, baseFTPrice: parseFloat(e.target.value) || 0}}))} className="w-full bg-slate-900 border-2 border-slate-800 text-4xl font-black text-white pl-10 pr-4 py-3 rounded-xl focus:border-amber-500 transition-all outline-none print:bg-transparent print:border-none print:text-black" />
+                        <input type="number" value={state.tuition.baseFTPrice} onChange={(e) => setState(s => ({...s, tuition: {...s.tuition, baseFTPrice: parseFloat(e.target.value) || 0}}))} className="w-full bg-slate-900 border-2 border-slate-800 text-3xl font-black text-white pl-10 pr-4 py-2 rounded-xl focus:border-amber-500 transition-all outline-none" />
                       </div>
                    </div>
-                   <div className="text-right">
-                      <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1">Monthly Approx</p>
-                      <p className="text-3xl font-black text-white print:text-black">${Math.round(state.tuition.baseFTPrice / 10).toLocaleString()}</p>
+                   <div className="text-right w-full md:w-auto">
+                      <p className="text-[9px] font-black uppercase text-amber-500 tracking-widest mb-0.5">TOTAL LEARNERS</p>
+                      <p className="text-3xl font-black text-white">{financials.students}</p>
                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {financials.tiers.map(t => (
-                    <div key={t.id} className="p-5 bg-slate-950/80 rounded-2xl border border-slate-800 hover:border-slate-700 transition-colors space-y-4 print:bg-white print:border-slate-200">
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-200 font-bold uppercase text-xs tracking-wider print:text-black">{t.label}</span>
-                        <div className="text-lg font-black text-teal-400 print:text-green-700">${Math.round(t.price).toLocaleString()}</div>
+                    <div key={t.id} className="p-4 bg-slate-950/60 rounded-2xl border border-slate-800 hover:border-slate-700 transition-colors">
+                      <div className="flex justify-between items-center mb-3">
+                        <div className="flex flex-col">
+                            <span className="text-slate-200 font-black uppercase text-[10px] tracking-wider">{t.label}</span>
+                            <div className="mt-1 flex items-center gap-2">
+                                <input 
+                                    type="number" 
+                                    value={t.ratio} 
+                                    onChange={(e) => setState(s => ({...s, tuition: {...s.tuition, tiers: {...s.tuition.tiers, [t.id]: {...t, ratio: parseFloat(e.target.value) || 0}} }}))}
+                                    className="w-10 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-[10px] font-black text-amber-500 text-center outline-none"
+                                />
+                                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">% Ratio</span>
+                            </div>
+                        </div>
+                        <div className="text-lg font-black text-teal-400">${Math.round(t.price).toLocaleString()}</div>
                       </div>
-                      <div className="bg-slate-900 rounded-xl p-3 flex justify-between items-center border border-slate-800 print:bg-slate-50 print:border-slate-200">
-                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Enrolled Qty</span>
-                        <input type="number" value={t.qty} onChange={(e) => setState(s => ({...s, tuition: {...s.tuition, tiers: {...s.tuition.tiers, [t.id]: {...t, qty: parseInt(e.target.value) || 0}} }}))} className="w-12 bg-slate-950 border border-slate-800 text-center font-black text-white py-1 rounded-lg outline-none focus:border-amber-500 print:bg-transparent" />
+                      <div className="bg-slate-900 rounded-xl p-3 flex justify-between items-center border border-slate-800">
+                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Enrolled Qty</span>
+                        <input type="number" value={t.qty} onChange={(e) => setState(s => ({...s, tuition: {...s.tuition, tiers: {...s.tuition.tiers, [t.id]: {...t, qty: parseInt(e.target.value) || 0}} }}))} className="w-12 bg-slate-950 border border-slate-800 text-center font-black text-white py-1 rounded-lg outline-none focus:border-amber-500" />
                       </div>
                     </div>
                   ))}
@@ -468,23 +473,22 @@ function App() {
               </section>
 
               {/* DISCOUNTS */}
-              <section className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-xl print:bg-white print:border-slate-400">
-                <h3 className="text-lg font-black text-white uppercase tracking-tighter mb-8 flex items-center print:text-black">
-                  <span className="w-1.5 h-6 bg-rose-500 mr-4 rounded-full"></span>
-                  Discounts & Aid
+              <section className="bg-slate-900/40 border border-slate-800 rounded-3xl p-5 md:p-6 shadow-xl">
+                <h3 className="text-lg font-black text-white uppercase tracking-tighter mb-4 flex items-center">
+                  <span className="w-1.5 h-6 bg-rose-500 mr-4 rounded-full"></span>DISCOUNTS
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {financials.discounts.map(d => (
-                    <div key={d.id} className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-4 print:bg-white print:border-slate-300">
-                      <div className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">{d.label}</div>
-                      <div className="flex justify-between items-center border-y border-slate-800/50 py-3 print:border-slate-100">
+                    <div key={d.id} className="p-3 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
+                      <div className="text-[9px] font-black uppercase text-slate-500 tracking-[0.2em]">{d.label}</div>
+                      <div className="flex justify-between items-center border-y border-slate-800/50 py-2">
                         <div className="text-center">
-                          <div className="text-[9px] text-slate-600 font-bold uppercase mb-1">Students</div>
-                          <input type="number" value={d.qty} onChange={(e) => setState(s => ({...s, discounts: {...s.discounts, [d.id]: {...d, qty: parseInt(e.target.value) || 0}} }))} className="bg-slate-900 border border-slate-800 w-10 text-center rounded text-xs font-black p-0.5" />
+                          <div className="text-[8px] text-slate-600 font-bold uppercase mb-0.5">Students</div>
+                          <input type="number" value={d.qty} onChange={(e) => setState(s => ({...s, discounts: {...s.discounts, [d.id]: {...d, qty: parseInt(e.target.value) || 0}} }))} className="bg-slate-900 border border-slate-800 w-8 text-center rounded text-[10px] font-black p-0.5" />
                         </div>
                         <div className="text-center">
-                          <div className="text-[9px] text-slate-600 font-bold uppercase mb-1">Disc %</div>
-                          <input type="number" value={d.discountPercent} onChange={(e) => setState(s => ({...s, discounts: {...s.discounts, [d.id]: {...d, discountPercent: parseFloat(e.target.value) || 0}} }))} className="bg-slate-900 border border-slate-800 w-10 text-center rounded text-xs font-black p-0.5" />
+                          <div className="text-[8px] text-slate-600 font-bold uppercase mb-0.5">Disc %</div>
+                          <input type="number" value={d.discountPercent} onChange={(e) => setState(s => ({...s, discounts: {...s.discounts, [d.id]: {...d, discountPercent: parseFloat(e.target.value) || 0}} }))} className="bg-slate-900 border border-slate-800 w-8 text-center rounded text-[10px] font-black p-0.5" />
                         </div>
                       </div>
                       <div className="text-right">
@@ -493,37 +497,37 @@ function App() {
                     </div>
                   ))}
                 </div>
-                <div className="mt-8 pt-6 border-t border-slate-800 flex justify-between items-center print:border-slate-300">
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Net Discounts</span>
-                  <span className="text-lg font-black text-rose-500">-${Math.round(financials.totalDiscounts).toLocaleString()}</span>
+                <div className="mt-4 pt-4 border-t border-slate-800 flex justify-between items-center">
+                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Net Savings</span>
+                  <span className="text-base font-black text-rose-500">-${Math.round(financials.totalDiscounts).toLocaleString()}</span>
                 </div>
               </section>
             </div>
 
             {/* REVENUE PIE CHART */}
-            <div className="space-y-8 print:break-inside-avoid">
-               <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 h-full flex flex-col shadow-2xl print:bg-white print:border-slate-400 min-h-[500px]">
-                  <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-10">Revenue Composition</h3>
-                  <div className="flex-1 relative min-h-[250px]">
+            <div className="space-y-6">
+               <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-5 md:p-6 flex flex-col shadow-2xl h-fit">
+                  <h3 className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Revenue Mix</h3>
+                  <div className="relative h-[200px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie data={pieData} cx="50%" cy="50%" innerRadius={70} outerRadius={95} paddingAngle={0} dataKey="value" stroke="#0a0f1d" strokeWidth={5}>
+                        <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={0} dataKey="value" stroke="#0a0f1d" strokeWidth={4}>
                           {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                         </Pie>
-                        <Tooltip contentStyle={{background: '#0a0f1d', border: '1px solid #1e293b', borderRadius: '12px'}} />
+                        <Tooltip contentStyle={{background: '#0a0f1d', border: '1px solid #1e293b', borderRadius: '12px', fontSize: '10px'}} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
-                  <div className="space-y-4 mt-8">
+                  <div className="space-y-3 mt-4">
                     {pieData.map((p, i) => (
-                      <div key={i} className="flex items-center justify-between group">
-                        <div className="flex items-center gap-3">
-                            <div className="w-2.5 h-2.5 rounded-full" style={{backgroundColor: COLORS[i % COLORS.length]}}></div>
-                            <span className="text-xs font-bold text-slate-400 group-hover:text-slate-200">{p.name}</span>
+                      <div key={i} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full" style={{backgroundColor: COLORS[i % COLORS.length]}}></div>
+                            <span className="text-[10px] font-bold text-slate-400">{p.name}</span>
                         </div>
                         <div className="text-right">
-                            <span className="text-xs font-mono font-bold text-slate-200 mr-4">${Math.round(p.value/1000).toLocaleString()}k</span>
-                            <span className="text-[10px] font-black text-slate-500 inline-block w-8">{Math.round((p.value/financials.totalRev)*100)}%</span>
+                            <span className="text-[10px] font-mono font-bold text-slate-200 mr-2">${Math.round(p.value/1000).toLocaleString()}K</span>
+                            <span className="text-[9px] font-black text-slate-500 inline-block w-6 text-right">{Math.round((p.value/financials.totalRev)*100)}%</span>
                         </div>
                       </div>
                     ))}
@@ -533,13 +537,10 @@ function App() {
           </div>
         </div>
 
-        {/* Tab 2: REVENUE */}
-        <div className={`${activeTab === 'revenue' ? 'block' : 'hidden'} print:block space-y-6`}>
-          <div className="flex items-center mb-6 print:mb-2">
-            <div className="w-1.5 h-6 bg-teal-500 mr-4 rounded-full"></div>
-            <h2 className="text-xl font-black text-white uppercase tracking-tighter print:text-black">Revenue Sources</h2>
-          </div>
-          <SmartTable 
+        {/* Revenue Tab */}
+        <div className={`${activeTab === 'revenue' ? 'block' : 'hidden'} space-y-4`}>
+           <h2 className="text-lg font-black text-white uppercase tracking-tighter">Revenue Sources</h2>
+           <SmartTable 
             items={financials.revItems} 
             type="revenue" 
             onUpdate={(id, f, v) => handleUpdate('revenue', id, f, v)}
@@ -549,13 +550,10 @@ function App() {
           />
         </div>
 
-        {/* Tab 3: BUDGET */}
-        <div className={`${activeTab === 'budget' ? 'block' : 'hidden'} print:block space-y-6`}>
-           <div className="flex items-center mb-6 print:mb-2">
-            <div className="w-1.5 h-6 bg-rose-500 mr-4 rounded-full"></div>
-            <h2 className="text-xl font-black text-white uppercase tracking-tighter print:text-black">Expense Ledger</h2>
-          </div>
-          <SmartTable 
+        {/* Budget Tab */}
+        <div className={`${activeTab === 'budget' ? 'block' : 'hidden'} space-y-4`}>
+            <h2 className="text-lg font-black text-white uppercase tracking-tighter">Expense Ledger</h2>
+            <SmartTable 
             items={financials.expItems} 
             type="budget" 
             onUpdate={(id, f, v) => handleUpdate('budget', id, f, v)}
@@ -567,25 +565,11 @@ function App() {
 
       <footer className="fixed bottom-0 left-0 w-full bg-slate-950/90 backdrop-blur-xl border-t border-slate-900 py-3 px-6 text-[9px] font-black text-slate-600 flex justify-between tracking-[0.2em] uppercase z-40 print:hidden">
         <div className="flex items-center gap-4">
-            <span className="text-slate-500">Sundrop Finance v27.4</span>
-            <span className="text-teal-900">AUTH: {user.email}</span>
+            <span className="text-slate-500">Sundrop Finance v27.8</span>
+            <span className="text-teal-900">SYSTEM READY</span>
         </div>
-        <span>{lastSaved ? `LAST SYNC: ${lastSaved.toLocaleTimeString()}` : 'SYNCING...'}</span>
+        <span>{lastSaved ? `SYNCED: ${lastSaved.toLocaleTimeString()}` : 'CONNECTING...'}</span>
       </footer>
-
-      <style dangerouslySetInnerHTML={{ __html: `
-        @media print {
-            body { background: white !important; color: black !important; }
-            .print\\:hidden { display: none !important; }
-            .print\\:block { display: block !important; }
-            .print\\:break-inside-avoid { break-inside: avoid; }
-            main { padding: 0 !important; width: 100% !important; max-width: 100% !important; }
-            section, .bg-slate-900 { border-color: #ddd !important; box-shadow: none !important; margin-bottom: 2rem !important; }
-            input { background: transparent !important; color: black !important; border: none !important; }
-            header, footer { display: none !important; }
-            .glass-panel { background: white !important; backdrop-filter: none !important; }
-        }
-      ` }} />
     </div>
   );
 }
