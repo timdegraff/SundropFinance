@@ -1,5 +1,5 @@
 // Sync update: v27.16 - Initial Counts Updated
-import { LineItem, FinancialState } from "./types.ts";
+import { LineItem, FinancialState, DiscountAllocation } from "./types.ts";
 
 export const BASELINE_BUDGET: LineItem[] = [
   { id: 'b_salaries', label: '101-702 Salaries & Wages', baseline: 190000, modifierPercent: 0, modifierFixed: 0 },
@@ -45,6 +45,16 @@ export const BASELINE_REVENUE: LineItem[] = [
   { id: 'r_fundraising', label: '101-410 Fundraising Revenue', baseline: 5000, modifierPercent: 0, modifierFixed: 0 },
 ];
 
+// Helper to create empty allocations for all tiers
+const createEmptyAllocations = (): Record<string, DiscountAllocation> => ({
+  tuitionFT: { qty: 0, discountPercent: 0 },
+  tuition4Day: { qty: 0, discountPercent: 0 },
+  tuition3Day: { qty: 0, discountPercent: 0 },
+  tuition2Day: { qty: 0, discountPercent: 0 },
+  tuition1Day: { qty: 0, discountPercent: 0 },
+  tuitionHalfDay: { qty: 0, discountPercent: 0 },
+});
+
 export const INITIAL_STATE: FinancialState = {
   tuition: {
     baseFTPrice: 7520,
@@ -58,9 +68,29 @@ export const INITIAL_STATE: FinancialState = {
     }
   },
   discounts: {
-    staff: { id: 'staff', label: 'Staff Discount', qty: 2, discountPercent: 50 },
-    sibling: { id: 'sibling', label: 'Sibling Discount', qty: 9, discountPercent: 5 },
-    early: { id: 'early', label: 'Early Bird', qty: 12, discountPercent: 5 },
+    // UPDATED STRUCTURE
+    staff: { 
+        id: 'staff', 
+        label: 'Staff Discount', 
+        allocations: {
+            ...createEmptyAllocations(),
+            tuitionFT: { qty: 2, discountPercent: 50 } // Example default
+        }
+    },
+    sibling: { 
+        id: 'sibling', 
+        label: 'Sibling Discount', 
+        allocations: {
+            ...createEmptyAllocations(),
+            tuitionFT: { qty: 5, discountPercent: 5 }, // Example default
+            tuition4Day: { qty: 4, discountPercent: 5 }
+        }
+    },
+    early: { 
+        id: 'early', 
+        label: 'Early Bird', 
+        allocations: createEmptyAllocations()
+    },
   },
   revenueItems: BASELINE_REVENUE,
   budgetItems: BASELINE_BUDGET
