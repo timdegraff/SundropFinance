@@ -1,4 +1,4 @@
-// Sync update: v27.13 - Discount Logic Update
+// services/calculationService.ts
 import { FinancialState, LineItem, TuitionTier, DiscountTier } from "../types.ts";
 
 export const calculateItemTotal = (item: LineItem): number => {
@@ -7,39 +7,52 @@ export const calculateItemTotal = (item: LineItem): number => {
 };
 
 export const calculateFinancials = (state: FinancialState) => {
-  // 1. Calculate Tuition Gross
+  // 1. Calculate Tuition Gross & Individual Tier Prices
   let totalTuitionGross = 0;
   let totalHeadcount = 0;
 
+  // We convert the tiers object to an array to iterate, but we also keep a map for easy lookup later
+  const calculatedTiersMap: Record<string, TuitionTier & { calculatedPrice: number }> = {};
+  
   const tiers = Object.values(state.tuition.tiers).map((tier: TuitionTier) => {
-    // Dynamic price based on Base FT Price * Ratio
-    // We treat the stored price as a cache, but recalculate here for display
     const calculatedPrice = state.tuition.baseFTPrice * (tier.ratio / 100);
     const gross = calculatedPrice * tier.qty;
+    
     totalTuitionGross += gross;
     totalHeadcount += tier.qty;
-    return { ...tier, calculatedPrice, gross };
+
+    const enrichedTier = { ...tier, calculatedPrice, gross };
+    calculatedTiersMap[tier.id] = enrichedTier; // Save for discount lookup
+    return enrichedTier;
   });
 
-  // 2. Calculate Discounts
-  // Logic update: Discounts are applied to the Full-Time price base, not average.
-  // Formula: (BaseFTPrice * (Discount% / 100)) * Qty
-  
+  // 2. Calculate Discounts (Matrix Logic)
   let totalDiscounts = 0;
+
   const processedDiscounts = Object.values(state.discounts).map((disc: DiscountTier) => {
-    const discountValue = (state.tuition.baseFTPrice * (disc.discountPercent / 100)) * disc.qty;
-    totalDiscounts += discountValue;
-    return { ...disc, discountValue };
+    let discTotal = 0;
+
+    // Iterate through allocations (FT, 3Day, etc.) within this specific discount
+    Object.entries(disc.allocations).forEach(([tierId, alloc]) => {
+        const tierData = calculatedTiersMap[tierId];
+        if (tierData && alloc.qty > 0) {
+            // Formula: (Price of this tier * (Discount% / 100)) * Qty of students
+            const value = (tierData.calculatedPrice * (alloc.discountPercent / 100)) * alloc.qty;
+            discTotal += value;
+        }
+    });
+
+    totalDiscounts += discTotal;
+    return { ...disc, totalDiscountValue: discTotal };
   });
 
   const netTuition = totalTuitionGross - totalDiscounts;
 
-  // 3. Calculate Revenue
+  // 3. Calculate Revenue (Unchanged)
   let totalRevenue = 0;
   const processedRevenue = state.revenueItems.map(item => {
     let val = 0;
     if (item.id === 'tuition') {
-        // HARD LINK to Strategy Tab
         val = netTuition;
     } else {
         val = calculateItemTotal(item);
@@ -48,7 +61,7 @@ export const calculateFinancials = (state: FinancialState) => {
     return { ...item, finalValue: val };
   });
 
-  // 4. Calculate Expenses
+  // 4. Calculate Expenses (Unchanged)
   let totalExpenses = 0;
   const processedBudget = state.budgetItems.map(item => {
     const val = calculateItemTotal(item);
