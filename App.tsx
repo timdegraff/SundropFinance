@@ -149,10 +149,10 @@ export default function App() {
 
         <div className="flex items-center gap-4">
            <div className="text-right hidden xl:block">
-              <span className="text-[9px] uppercase text-slate-500 font-black tracking-widest block leading-none mb-1">Net Margin</span>
-              <span className={`text-xl font-black leading-none ${financials.netMargin >= 0 ? 'text-teal-400' : 'text-rose-500'}`}>
-                  ${Math.round(financials.netMargin).toLocaleString()}
-              </span>
+             <span className="text-[9px] uppercase text-slate-500 font-black tracking-widest block leading-none mb-1">Net Margin</span>
+             <span className={`text-xl font-black leading-none ${financials.netMargin >= 0 ? 'text-teal-400' : 'text-rose-500'}`}>
+                 ${Math.round(financials.netMargin).toLocaleString()}
+             </span>
            </div>
            <div className="h-10 border-l border-slate-800/50 hidden md:block"></div>
            <div className="flex items-center gap-3 bg-slate-900/50 rounded-full pl-4 pr-1.5 py-1.5 border border-slate-800/50">
@@ -257,29 +257,95 @@ export default function App() {
                 <h3 className="text-lg font-black text-white uppercase tracking-tighter mb-4 flex items-center">
                   <span className="w-1.5 h-6 bg-rose-500 mr-4 rounded-full"></span>DISCOUNTS
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                
+                <div className="space-y-6">
                   {financials.processedDiscounts.map(d => (
-                    <div key={d.id} className="p-3 bg-slate-950 rounded-2xl border border-slate-800 space-y-3 shadow-lg">
-                      <div className="text-[9px] font-black uppercase text-slate-500 tracking-[0.15em]">{d.label}</div>
-                      <div className="flex justify-between items-center border-y border-slate-800/50 py-2">
-                        <div className="text-center">
-                          <div className="text-[8px] text-slate-600 font-bold uppercase mb-0.5">Learners</div>
-                          <input type="number" value={d.qty} onChange={(e) => setState(s => ({...s, discounts: {...s.discounts, [d.id]: {...d, qty: parseInt(e.target.value) || 0}} }))} className="bg-slate-900 border border-slate-800 w-16 text-center rounded text-[10px] font-black p-0.5 text-white" />
-                        </div>
-                        <div className="text-center">
-                          <div className="text-[8px] text-slate-600 font-bold uppercase mb-0.5">Disc %</div>
-                          <input type="number" value={d.discountPercent} onChange={(e) => setState(s => ({...s, discounts: {...s.discounts, [d.id]: {...d, discountPercent: parseFloat(e.target.value) || 0}} }))} className="bg-slate-900 border border-slate-800 w-12 text-center rounded text-[10px] font-black p-0.5 text-white" />
-                        </div>
+                    <div key={d.id} className="p-4 bg-slate-950/50 rounded-2xl border border-slate-800 shadow-lg">
+                      <div className="flex justify-between items-end mb-3 pb-2 border-b border-slate-800/50">
+                          <div className="text-[10px] font-black uppercase text-amber-500 tracking-[0.15em]">{d.label}</div>
+                          <div className="text-sm font-black text-rose-500">-${Math.round(d.totalDiscountValue || 0).toLocaleString()}</div>
                       </div>
-                      <div className="text-right">
-                        <span className="text-xs font-black text-rose-500">-${Math.round(d.discountValue).toLocaleString()}</span>
+
+                      <div className="grid grid-cols-12 gap-2 mb-2 px-1">
+                          <div className="col-span-4 text-[8px] font-black text-slate-600 uppercase tracking-widest">Tier</div>
+                          <div className="col-span-3 text-[8px] font-black text-slate-600 uppercase tracking-widest text-center">Learners</div>
+                          <div className="col-span-3 text-[8px] font-black text-slate-600 uppercase tracking-widest text-center">Disc %</div>
+                          <div className="col-span-2 text-[8px] font-black text-slate-600 uppercase tracking-widest text-right">Saving</div>
+                      </div>
+
+                      <div className="space-y-1">
+                        {financials.tiers.map((tier) => {
+                            const alloc = d.allocations?.[tier.id] || { qty: 0, discountPercent: 0 };
+                            const saving = (tier.calculatedPrice * (alloc.discountPercent / 100)) * alloc.qty;
+                            
+                            return (
+                                <div key={tier.id} className="grid grid-cols-12 gap-2 items-center hover:bg-slate-900/50 rounded p-1 transition-colors">
+                                    <div className="col-span-4 text-[9px] font-bold text-slate-400 truncate">
+                                        {tier.label}
+                                    </div>
+
+                                    <div className="col-span-3 text-center">
+                                        <input 
+                                            type="number" 
+                                            value={alloc.qty} 
+                                            onChange={(e) => {
+                                                const val = parseInt(e.target.value) || 0;
+                                                setState(s => ({
+                                                    ...s, 
+                                                    discounts: {
+                                                        ...s.discounts,
+                                                        [d.id]: {
+                                                            ...s.discounts[d.id],
+                                                            allocations: {
+                                                                ...s.discounts[d.id].allocations,
+                                                                [tier.id]: { ...alloc, qty: val }
+                                                            }
+                                                        }
+                                                    }
+                                                }));
+                                            }}
+                                            className="bg-slate-900 border border-slate-700 focus:border-amber-500 w-full text-center rounded text-[10px] font-black py-1 text-white outline-none" 
+                                        />
+                                    </div>
+
+                                    <div className="col-span-3 text-center">
+                                        <input 
+                                            type="number" 
+                                            value={alloc.discountPercent} 
+                                            onChange={(e) => {
+                                                const val = parseFloat(e.target.value) || 0;
+                                                setState(s => ({
+                                                    ...s, 
+                                                    discounts: {
+                                                        ...s.discounts,
+                                                        [d.id]: {
+                                                            ...s.discounts[d.id],
+                                                            allocations: {
+                                                                ...s.discounts[d.id].allocations,
+                                                                [tier.id]: { ...alloc, discountPercent: val }
+                                                            }
+                                                        }
+                                                    }
+                                                }));
+                                            }}
+                                            className="bg-slate-900 border border-slate-700 focus:border-amber-500 w-full text-center rounded text-[10px] font-black py-1 text-white outline-none" 
+                                        />
+                                    </div>
+
+                                    <div className="col-span-2 text-right text-[9px] font-mono text-slate-500">
+                                        {saving > 0 ? `-${Math.round(saving).toLocaleString()}` : '-'}
+                                    </div>
+                                </div>
+                            );
+                        })}
                       </div>
                     </div>
                   ))}
                 </div>
-                <div className="mt-4 pt-4 border-t border-slate-800 flex justify-between items-center">
-                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Net Savings</span>
-                  <span className="text-base font-black text-rose-500">-${Math.round(financials.totalDiscounts).toLocaleString()}</span>
+
+                <div className="mt-6 pt-4 border-t border-slate-800 flex justify-between items-center">
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Savings</span>
+                  <span className="text-xl font-black text-rose-500">-${Math.round(financials.totalDiscounts).toLocaleString()}</span>
                 </div>
               </section>
             </div>
