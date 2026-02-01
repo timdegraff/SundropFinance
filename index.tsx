@@ -661,7 +661,7 @@ export default function App() {
       </div>
     );
   }
-
+ 
   return (
     <div className="min-h-screen pb-20 bg-[#0a0f1d] print:bg-white print:text-black">
       <header className="sticky top-0 z-50 glass-panel border-b border-slate-800/50 px-6 h-16 flex items-center justify-between no-print">
