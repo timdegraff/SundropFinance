@@ -624,6 +624,29 @@ export default function App() {
     });
   };
 
+  const handleAddItem = (type: 'revenue' | 'budget') => {
+    const prefix = type === 'revenue' ? 'r_custom' : 'b_custom';
+    const newItem: LineItem = {
+      id: `${prefix}_${Date.now()}`,
+      label: 'New Item',
+      baseline: 0,
+      modifierPercent: 0,
+      modifierFixed: 0
+    };
+    setState(prev => {
+      const list = type === 'revenue' ? [...prev.revenueItems, newItem] : [...prev.budgetItems, newItem];
+      return { ...prev, [type === 'revenue' ? 'revenueItems' : 'budgetItems']: list };
+    });
+  };
+
+  const handleDeleteItem = (type: 'revenue' | 'budget', id: string) => {
+    if (type === 'revenue' && id === 'tuition') return; // Never delete tuition
+    setState(prev => {
+      const list = (type === 'revenue' ? prev.revenueItems : prev.budgetItems).filter(item => item.id !== id);
+      return { ...prev, [type === 'revenue' ? 'revenueItems' : 'budgetItems']: list };
+    });
+  };
+
   const financials = calculateFinancials(state);
 
   const revenuePieData = useMemo(() => {
@@ -931,13 +954,13 @@ export default function App() {
         {/* Revenue Section */}
         <div className={`${activeTab === 'revenue' ? 'block' : 'hidden'} print-section space-y-2`}>
            <h2 className="text-lg font-bold text-white uppercase tracking-tighter mb-1">Revenue Sources</h2>
-           <SmartTable items={financials.processedRevenue} type="revenue" onUpdate={(id, f, v) => handleLineItemUpdate('revenue', id, f, v)} onAdd={() => {}} onDelete={() => {}} onMoveUp={(id) => handleMoveItem('revenue', id, 'up')} onMoveDown={(id) => handleMoveItem('revenue', id, 'down')} readOnlyIds={['tuition']} />
+           <SmartTable items={financials.processedRevenue} type="revenue" onUpdate={(id, f, v) => handleLineItemUpdate('revenue', id, f, v)} onAdd={() => handleAddItem('revenue')} onDelete={(id) => handleDeleteItem('revenue', id)} onMoveUp={(id) => handleMoveItem('revenue', id, 'up')} onMoveDown={(id) => handleMoveItem('revenue', id, 'down')} readOnlyIds={['tuition']} />
         </div>
 
         {/* Budget Section */}
         <div className={`${activeTab === 'budget' ? 'block' : 'hidden'} print-section space-y-2`}>
             <h2 className="text-lg font-bold text-white uppercase tracking-tighter mb-1">Expense Ledger</h2>
-            <SmartTable items={financials.processedBudget} type="budget" onUpdate={(id, f, v) => handleLineItemUpdate('budget', id, f, v)} onAdd={() => {}} onDelete={() => {}} onMoveUp={(id) => handleMoveItem('budget', id, 'up')} onMoveDown={(id) => handleMoveItem('budget', id, 'down')} />
+            <SmartTable items={financials.processedBudget} type="budget" onUpdate={(id, f, v) => handleLineItemUpdate('budget', id, f, v)} onAdd={() => handleAddItem('budget')} onDelete={(id) => handleDeleteItem('budget', id)} onMoveUp={(id) => handleMoveItem('budget', id, 'up')} onMoveDown={(id) => handleMoveItem('budget', id, 'down')} />
         </div>
       </main>
 
