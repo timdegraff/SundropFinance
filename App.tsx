@@ -80,6 +80,20 @@ export default function App() {
     });
   };
 
+  const handleMoveItem = (type: 'revenue' | 'budget', id: string, direction: 'up' | 'down') => {
+    setState(prev => {
+      const list = type === 'revenue' ? [...prev.revenueItems] : [...prev.budgetItems];
+      const i = list.findIndex(item => item.id === id);
+      if (i === -1) return prev;
+      if (direction === 'up' && i > 0) {
+        [list[i - 1], list[i]] = [list[i], list[i - 1]];
+      } else if (direction === 'down' && i < list.length - 1) {
+        [list[i], list[i + 1]] = [list[i + 1], list[i]];
+      } else return prev;
+      return { ...prev, [type === 'revenue' ? 'revenueItems' : 'budgetItems']: list };
+    });
+  };
+
   const financials = calculateFinancials(state);
 
   const revenuePieData = useMemo(() => {
@@ -388,13 +402,13 @@ export default function App() {
         {/* Revenue Section */}
         <div className={`${activeTab === 'revenue' ? 'block' : 'hidden'} print-section space-y-2`}>
            <h2 className="text-lg font-bold text-white uppercase tracking-tighter mb-1">Revenue Sources</h2>
-           <SmartTable items={financials.processedRevenue} type="revenue" onUpdate={(id, f, v) => handleLineItemUpdate('revenue', id, f, v)} onAdd={() => {}} onDelete={() => {}} readOnlyIds={['tuition']} />
+           <SmartTable items={financials.processedRevenue} type="revenue" onUpdate={(id, f, v) => handleLineItemUpdate('revenue', id, f, v)} onAdd={() => {}} onDelete={() => {}} onMoveUp={(id) => handleMoveItem('revenue', id, 'up')} onMoveDown={(id) => handleMoveItem('revenue', id, 'down')} readOnlyIds={['tuition']} />
         </div>
 
         {/* Budget Section */}
         <div className={`${activeTab === 'budget' ? 'block' : 'hidden'} print-section space-y-2`}>
             <h2 className="text-lg font-bold text-white uppercase tracking-tighter mb-1">Expense Ledger</h2>
-            <SmartTable items={financials.processedBudget} type="budget" onUpdate={(id, f, v) => handleLineItemUpdate('budget', id, f, v)} onAdd={() => {}} onDelete={() => {}} />
+            <SmartTable items={financials.processedBudget} type="budget" onUpdate={(id, f, v) => handleLineItemUpdate('budget', id, f, v)} onAdd={() => {}} onDelete={() => {}} onMoveUp={(id) => handleMoveItem('budget', id, 'up')} onMoveDown={(id) => handleMoveItem('budget', id, 'down')} />
         </div>
       </main>
 

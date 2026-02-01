@@ -9,10 +9,12 @@ interface SmartTableProps {
   onUpdate: (id: string, field: 'modifierPercent' | 'modifierFixed' | 'finalValue' | 'baseline' | 'label', value: any) => void;
   onAdd: () => void;
   onDelete: (id: string) => void;
+  onMoveUp?: (id: string) => void;
+  onMoveDown?: (id: string) => void;
   readOnlyIds?: string[];
 }
 
-export const SmartTable: React.FC<SmartTableProps> = ({ items, type, onUpdate, onAdd, onDelete, readOnlyIds = [] }) => {
+export const SmartTable: React.FC<SmartTableProps> = ({ items, type, onUpdate, onAdd, onDelete, onMoveUp, onMoveDown, readOnlyIds = [] }) => {
   const isRevenue = type === 'revenue';
   const totalColor = isRevenue ? 'text-teal-400' : 'text-rose-400';
   const totalBaseline = items.reduce((acc, item) => acc + item.baseline, 0);
@@ -32,11 +34,12 @@ export const SmartTable: React.FC<SmartTableProps> = ({ items, type, onUpdate, o
             <th className="px-8 py-3 text-center">Strategy %</th>
             <th className="px-8 py-3 text-center">Delta ($)</th>
             <th className="px-8 py-3 text-right">FY27 Final</th>
+            <th className="px-2 py-3 text-center w-16">Order</th>
             <th className="px-4 py-3 w-10"></th>
           </tr>
         </thead>
         <tbody>
-          {items.map((item) => {
+          {items.map((item, index) => {
             const isReadOnly = readOnlyIds.includes(item.id);
             const final = getFinal(item);
             const delta = final - item.baseline;
@@ -90,6 +93,30 @@ export const SmartTable: React.FC<SmartTableProps> = ({ items, type, onUpdate, o
                 <td className={`px-8 py-3 text-right font-bold font-mono ${isRevenue ? 'text-teal-400' : 'text-rose-400'}`}>
                    ${Math.round(final).toLocaleString()}
                 </td>
+                <td className="px-2 py-3">
+                  {onMoveUp && onMoveDown && (
+                    <div className="flex items-center justify-center gap-0.5">
+                      <button
+                        type="button"
+                        onClick={() => onMoveUp(item.id)}
+                        disabled={index === 0}
+                        className="p-1 rounded text-slate-500 hover:text-amber-500 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-500 transition-all"
+                        aria-label="Move up"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onMoveDown(item.id)}
+                        disabled={index === items.length - 1}
+                        className="p-1 rounded text-slate-500 hover:text-amber-500 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-500 transition-all"
+                        aria-label="Move down"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                      </button>
+                    </div>
+                  )}
+                </td>
                 <td className="px-4 py-3">
                   {!isReadOnly && (
                     <button onClick={() => onDelete(item.id)} className="text-slate-700 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all">
@@ -114,6 +141,7 @@ export const SmartTable: React.FC<SmartTableProps> = ({ items, type, onUpdate, o
                 <td className={`px-8 py-4 text-right text-lg ${totalColor} font-mono`}>
                     ${Math.round(totalFinal).toLocaleString()}
                 </td>
+                <td></td>
                 <td></td>
             </tr>
         </tfoot>
