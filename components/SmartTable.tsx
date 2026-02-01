@@ -25,7 +25,7 @@ export const SmartTable: React.FC<SmartTableProps> = ({ items, type, onUpdate, o
   return (
     <div className="overflow-x-auto rounded-3xl border border-slate-800 bg-slate-900/40 backdrop-blur-xl">
       <table className="w-full text-sm text-left text-slate-300">
-        <thead className="text-[10px] uppercase bg-slate-950/80 text-slate-500 font-black tracking-widest border-b border-slate-800">
+        <thead className="text-[10px] uppercase bg-slate-950/80 text-slate-500 font-bold tracking-widest border-b border-slate-800">
           <tr>
             <th className="px-8 py-3">Line Item</th>
             <th className="px-8 py-3 text-right">FY26 Baseline</th>
@@ -73,7 +73,7 @@ export const SmartTable: React.FC<SmartTableProps> = ({ items, type, onUpdate, o
                         onChange={(e) => onUpdate(item.id, 'modifierPercent', parseFloat(e.target.value) || 0)}
                         className="w-16 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-right text-xs focus:border-amber-500 outline-none"
                       />
-                      <span className="text-[10px] text-slate-600 font-black">%</span>
+                      <span className="text-[10px] text-slate-600 font-bold">%</span>
                     </div>
                   )}
                 </td>
@@ -87,7 +87,7 @@ export const SmartTable: React.FC<SmartTableProps> = ({ items, type, onUpdate, o
                     />
                   )}
                 </td>
-                <td className={`px-8 py-3 text-right font-black font-mono ${isRevenue ? 'text-teal-400' : 'text-rose-400'}`}>
+                <td className={`px-8 py-3 text-right font-bold font-mono ${isRevenue ? 'text-teal-400' : 'text-rose-400'}`}>
                    ${Math.round(final).toLocaleString()}
                 </td>
                 <td className="px-4 py-3">
@@ -101,7 +101,7 @@ export const SmartTable: React.FC<SmartTableProps> = ({ items, type, onUpdate, o
             );
           })}
         </tbody>
-        <tfoot className="bg-slate-950/80 font-black border-t border-slate-700">
+        <tfoot className="bg-slate-950/80 font-bold border-t border-slate-700">
             <tr>
                 <td className="px-8 py-4">
                   <button onClick={onAdd} className="flex items-center gap-2 text-[10px] text-amber-500 hover:text-amber-400 uppercase tracking-[0.2em] transition-all">

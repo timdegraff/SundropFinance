@@ -88,7 +88,7 @@ export const INITIAL_STATE: FinancialState = {
     },
     early: { 
         id: 'early', 
-        label: 'Early Bird', 
+        label: 'Pre-Pay', 
         allocations: createEmptyAllocations()
     },
   },
