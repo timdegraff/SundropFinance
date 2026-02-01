@@ -210,8 +210,12 @@ export const loadState = async (): Promise<FinancialState | null> => {
              const dKey = key as keyof typeof baseDiscounts;
              const remoteDisc = data.discounts[dKey];
              // If remote has allocations, use them; otherwise fallback to initial
+             // Keep id/label from INITIAL_STATE (code wins over stale Firebase)
              if (remoteDisc && remoteDisc.allocations) {
-                 mergedDiscounts[dKey] = remoteDisc;
+                 mergedDiscounts[dKey] = {
+                     ...baseDiscounts[dKey],
+                     allocations: remoteDisc.allocations
+                 };
              }
           });
       }
@@ -247,7 +251,10 @@ export const subscribeToState = (callback: (state: FinancialState) => void) => {
                     const dKey = key as keyof typeof baseDiscounts;
                     const remoteDisc = data.discounts[dKey];
                     if (remoteDisc && remoteDisc.allocations) {
-                        mergedDiscounts[dKey] = remoteDisc;
+                        mergedDiscounts[dKey] = {
+                            ...baseDiscounts[dKey],
+                            allocations: remoteDisc.allocations
+                        };
                     }
                  });
              }
