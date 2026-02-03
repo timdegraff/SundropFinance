@@ -348,15 +348,13 @@ export const calculateFinancials = (state: FinancialState) => {
 
   const netTuition = totalTuitionGross - totalDiscounts;
 
-  // FSAS yearly revenue: (sum over tiers of qty * sum of 5 day hours) = total hours/week; * 36 weeks * $/hr
+  // FSAS yearly revenue: each cell = total kid-hours per day (Children × Hours). Sum all cells for week; * 36 weeks * $/hr
   const FSAS_WEEKS = 36;
   const fsasState = state.fsas || INITIAL_STATE.fsas!;
   let fsasTotalHoursPerWeek = 0;
   TIER_ORDER.forEach((tierId) => {
-    const tier = state.tuition.tiers[tierId] || INITIAL_STATE.tuition.tiers[tierId];
     const hours = fsasState.hoursByTier[tierId] || [0, 0, 0, 0, 0];
-    const tierHoursPerWeek = (tier?.qty || 0) * (hours[0] + hours[1] + hours[2] + hours[3] + hours[4]);
-    fsasTotalHoursPerWeek += tierHoursPerWeek;
+    fsasTotalHoursPerWeek += hours[0] + hours[1] + hours[2] + hours[3] + hours[4];
   });
   const fsasYearlyRevenue = fsasTotalHoursPerWeek * FSAS_WEEKS * (fsasState.dollarPerHour || 0);
 
@@ -998,6 +996,8 @@ export default function App() {
             </h2>
             <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-4">Feeds 101-405 Afterschool Program Revenue</p>
 
+            <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest mb-4">Enter the total number of estimated Child-Hours per day (Children × # of Hours).</p>
+
             <div className="bg-slate-950/80 p-4 md:p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row gap-4 md:gap-8 items-center justify-between mb-6">
               <div className="flex-1 w-full">
                 <label className="text-[9px] text-amber-500 font-bold uppercase tracking-widest mb-2 block">Total $/hr (Rate)</label>
@@ -1021,16 +1021,16 @@ export default function App() {
             </div>
 
             <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/80">
-              <table className="w-full text-sm text-left text-slate-300">
+              <table className="w-full text-sm text-slate-300 table-fixed">
                 <thead className="text-[10px] uppercase bg-slate-950/80 text-slate-500 font-bold tracking-widest border-b border-slate-800">
                   <tr>
-                    <th className="px-4 py-3">Tier</th>
-                    <th className="px-4 py-3 text-right"># Students</th>
-                    <th className="px-4 py-3 text-center">Mon</th>
-                    <th className="px-4 py-3 text-center">Tue</th>
-                    <th className="px-4 py-3 text-center">Wed</th>
-                    <th className="px-4 py-3 text-center">Thu</th>
-                    <th className="px-4 py-3 text-center">Fri</th>
+                    <th className="py-3 text-center w-[14.28%]">Tier</th>
+                    <th className="py-3 text-center w-[14.28%]"># Students</th>
+                    <th className="py-3 text-center w-[14.28%]">Mon</th>
+                    <th className="py-3 text-center w-[14.28%]">Tue</th>
+                    <th className="py-3 text-center w-[14.28%]">Wed</th>
+                    <th className="py-3 text-center w-[14.28%]">Thu</th>
+                    <th className="py-3 text-center w-[14.28%]">Fri</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1047,10 +1047,10 @@ export default function App() {
                     };
                     return (
                       <tr key={tierId} className="border-b border-slate-800/40 hover:bg-slate-800/20 transition-all">
-                        <td className="px-4 py-3 font-medium text-slate-200">{shortLabels[tierId] ?? tier?.label}</td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-300">{tier?.qty ?? 0}</td>
+                        <td className="py-3 text-center font-medium text-slate-200">{shortLabels[tierId] ?? tier?.label}</td>
+                        <td className="py-3 text-center font-mono text-slate-300">{tier?.qty ?? 0}</td>
                         {[0, 1, 2, 3, 4].map((dayIdx) => (
-                          <td key={dayIdx} className="px-2 py-2">
+                          <td key={dayIdx} className="py-2 text-center">
                             <input
                               type="number"
                               min={0}
@@ -1065,7 +1065,7 @@ export default function App() {
                                   return { ...s, fsas: { ...fsas, hoursByTier: { ...fsas.hoursByTier, [tierId]: next } } };
                                 });
                               }}
-                              className="w-14 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-center text-xs font-mono text-white focus:border-amber-500 outline-none"
+                              className="w-full max-w-[4rem] mx-auto block bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-center text-xs font-mono text-white focus:border-amber-500 outline-none"
                             />
                           </td>
                         ))}
@@ -1075,16 +1075,15 @@ export default function App() {
                 </tbody>
                 <tfoot className="bg-slate-950/80 font-bold border-t border-slate-700 text-[10px] uppercase text-slate-500 tracking-widest">
                   <tr>
-                    <td className="px-4 py-3">Sub-total (hrs/day)</td>
-                    <td className="px-4 py-3 text-right">—</td>
+                    <td className="py-3 text-center">Sub-total (hrs/day)</td>
+                    <td className="py-3 text-center">—</td>
                     {[0, 1, 2, 3, 4].map((dayIdx) => {
                       const dayTotal = TIER_ORDER.reduce((sum, tierId) => {
-                        const tier = state.tuition.tiers[tierId] || INITIAL_STATE.tuition.tiers[tierId];
                         const hours = (state.fsas?.hoursByTier || INITIAL_STATE.fsas!.hoursByTier)[tierId] || [0, 0, 0, 0, 0];
-                        return sum + (tier?.qty || 0) * (hours[dayIdx] || 0);
+                        return sum + (hours[dayIdx] || 0);
                       }, 0);
                       return (
-                        <td key={dayIdx} className="px-4 py-3 text-center font-mono text-teal-400">{dayTotal > 0 ? dayTotal.toFixed(1) : '—'}</td>
+                        <td key={dayIdx} className="py-3 text-center font-mono text-teal-400">{dayTotal > 0 ? dayTotal.toFixed(1) : '—'}</td>
                       );
                     })}
                   </tr>
@@ -1109,11 +1108,16 @@ export default function App() {
 
       <footer className="fixed bottom-0 left-0 w-full bg-slate-950/90 backdrop-blur-xl border-t border-slate-900 py-3 px-6 text-[9px] font-bold text-slate-600 flex justify-between tracking-[0.2em] uppercase z-40 no-print">
         <div className="flex items-center gap-4">
-            <span className="text-slate-500">Sundrop Finance v27.28</span>
+            <span className="text-slate-500">
+              Sundrop Finance FY27 - Updated
+              {lastSaved && (
+                <> {lastSaved.toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })} EST</>
+              )}
+            </span>
             <span className="text-teal-900">SYSTEM READY</span>
         </div>
         <div className="flex gap-4">
-            <span>{lastSaved ? `SYNCED: ${lastSaved.toLocaleTimeString()}` : "CONNECTING..."}</span>
+            <span>{lastSaved ? "SYNCED" : "CONNECTING..."}</span>
         </div>
       </footer>
     </div>
