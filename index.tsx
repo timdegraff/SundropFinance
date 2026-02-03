@@ -40,6 +40,12 @@ export interface DiscountTier {
   totalDiscountValue?: number; // Helper for display
 }
 
+/** FSAS: hours per tier per day [Mon, Tue, Wed, Thu, Fri] */
+export interface FSASState {
+  dollarPerHour: number;
+  hoursByTier: Record<string, number[]>;
+}
+
 export interface FinancialState {
   tuition: {
     baseFTPrice: number;
@@ -48,10 +54,12 @@ export interface FinancialState {
   discounts: Record<string, DiscountTier>;
   revenueItems: LineItem[];
   budgetItems: LineItem[];
+  fsas?: FSASState;
 }
 
 export const CARDS = {
     STRATEGY: 'strategy',
+    FSAS: 'fsas',
     REVENUE: 'revenue',
     BUDGET: 'budget',
     MONTHLY: 'monthly'
@@ -145,7 +153,11 @@ export const INITIAL_STATE: FinancialState = {
     },
   },
   revenueItems: BASELINE_REVENUE,
-  budgetItems: BASELINE_BUDGET
+  budgetItems: BASELINE_BUDGET,
+  fsas: {
+    dollarPerHour: 0,
+    hoursByTier: TIER_ORDER.reduce((acc, id) => ({ ...acc, [id]: [0, 0, 0, 0, 0] }), {} as Record<string, number[]>)
+  }
 };
 
 export const FIREBASE_CONFIG = {
@@ -220,6 +232,11 @@ export const loadState = async (): Promise<FinancialState | null> => {
           });
       }
 
+      const baseFsas = INITIAL_STATE.fsas!;
+      const mergedFsas = data.fsas
+        ? { dollarPerHour: data.fsas.dollarPerHour ?? baseFsas.dollarPerHour, hoursByTier: { ...baseFsas.hoursByTier, ...data.fsas.hoursByTier } }
+        : baseFsas;
+
       return {
         ...INITIAL_STATE,
         ...data,
@@ -227,7 +244,8 @@ export const loadState = async (): Promise<FinancialState | null> => {
             ...INITIAL_STATE.tuition,
             ...data.tuition
         },
-        discounts: mergedDiscounts
+        discounts: mergedDiscounts,
+        fsas: mergedFsas
       };
     } else {
       return null;
@@ -259,6 +277,11 @@ export const subscribeToState = (callback: (state: FinancialState) => void) => {
                  });
              }
 
+             const baseFsas = INITIAL_STATE.fsas!;
+             const mergedFsas = data.fsas
+               ? { dollarPerHour: data.fsas.dollarPerHour ?? baseFsas.dollarPerHour, hoursByTier: { ...baseFsas.hoursByTier, ...data.fsas.hoursByTier } }
+               : baseFsas;
+
              const merged = {
                 ...INITIAL_STATE,
                 ...data,
@@ -266,7 +289,8 @@ export const subscribeToState = (callback: (state: FinancialState) => void) => {
                     ...INITIAL_STATE.tuition,
                     ...data.tuition
                 },
-                discounts: mergedDiscounts
+                discounts: mergedDiscounts,
+                fsas: mergedFsas
              };
              callback(merged);
         }
@@ -324,12 +348,26 @@ export const calculateFinancials = (state: FinancialState) => {
 
   const netTuition = totalTuitionGross - totalDiscounts;
 
+  // FSAS yearly revenue: (sum over tiers of qty * sum of 5 day hours) = total hours/week; * 36 weeks * $/hr
+  const FSAS_WEEKS = 36;
+  const fsasState = state.fsas || INITIAL_STATE.fsas!;
+  let fsasTotalHoursPerWeek = 0;
+  TIER_ORDER.forEach((tierId) => {
+    const tier = state.tuition.tiers[tierId] || INITIAL_STATE.tuition.tiers[tierId];
+    const hours = fsasState.hoursByTier[tierId] || [0, 0, 0, 0, 0];
+    const tierHoursPerWeek = (tier?.qty || 0) * (hours[0] + hours[1] + hours[2] + hours[3] + hours[4]);
+    fsasTotalHoursPerWeek += tierHoursPerWeek;
+  });
+  const fsasYearlyRevenue = fsasTotalHoursPerWeek * FSAS_WEEKS * (fsasState.dollarPerHour || 0);
+
   // 3. Revenue
   let totalRevenue = 0;
   const processedRevenue = state.revenueItems.map(item => {
     let val = 0;
     if (item.id === 'tuition') {
         val = netTuition;
+    } else if (item.id === 'r_afterschool') {
+        val = fsasYearlyRevenue;
     } else {
         val = calculateItemTotal(item);
     }
@@ -703,6 +741,7 @@ export default function App() {
         <nav className="flex items-center space-x-1 bg-slate-950 rounded-full p-1 border border-slate-800/50">
           {[
             { id: 'strategy', label: 'STRATEGY', short: 'STRAT' },
+            { id: 'fsas', label: 'FSAS', short: 'FSAS' },
             { id: 'revenue', label: 'REVENUE', short: 'REV' },
             { id: 'budget', label: 'BUDGET', short: 'BUDG' }
           ].map((tab) => (
@@ -951,10 +990,114 @@ export default function App() {
           </div>
         </div>
 
+        {/* FSAS Section */}
+        <div className={`${activeTab === 'fsas' ? 'block' : 'hidden'} print-section space-y-6`}>
+          <section className="bg-slate-900/40 border border-slate-800/60 rounded-3xl p-5 md:p-6 shadow-2xl">
+            <h2 className="text-lg font-bold text-white uppercase tracking-tighter mb-4 flex items-center">
+              <span className="w-1.5 h-6 bg-amber-500 mr-4 rounded-full"></span>Afterschool Revenue Calculator
+            </h2>
+            <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-4">Feeds 101-405 Afterschool Program Revenue</p>
+
+            <div className="bg-slate-950/80 p-4 md:p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row gap-4 md:gap-8 items-center justify-between mb-6">
+              <div className="flex-1 w-full">
+                <label className="text-[9px] text-amber-500 font-bold uppercase tracking-widest mb-2 block">Total $/hr (Rate)</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-2xl font-light">$</span>
+                  <input
+                    type="number"
+                    value={state.fsas?.dollarPerHour ?? ''}
+                    onChange={(e) => setState(s => ({
+                      ...s,
+                      fsas: { ...(s.fsas || INITIAL_STATE.fsas!), dollarPerHour: parseFloat(e.target.value) || 0 }
+                    }))}
+                    className="w-full bg-slate-900 border-2 border-slate-800 text-3xl font-bold text-white pl-10 pr-4 py-2 rounded-xl focus:border-amber-500 outline-none"
+                  />
+                </div>
+              </div>
+              <div className="text-right w-full md:w-auto">
+                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">FY27 Afterschool Revenue</p>
+                <p className="text-2xl font-bold text-teal-400">${Math.round(financials.processedRevenue.find(i => i.id === 'r_afterschool')?.finalValue || 0).toLocaleString()}</p>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/80">
+              <table className="w-full text-sm text-left text-slate-300">
+                <thead className="text-[10px] uppercase bg-slate-950/80 text-slate-500 font-bold tracking-widest border-b border-slate-800">
+                  <tr>
+                    <th className="px-4 py-3">Tier</th>
+                    <th className="px-4 py-3 text-right"># Students</th>
+                    <th className="px-4 py-3 text-center">Mon</th>
+                    <th className="px-4 py-3 text-center">Tue</th>
+                    <th className="px-4 py-3 text-center">Wed</th>
+                    <th className="px-4 py-3 text-center">Thu</th>
+                    <th className="px-4 py-3 text-center">Fri</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {TIER_ORDER.map((tierId) => {
+                    const tier = state.tuition.tiers[tierId] || INITIAL_STATE.tuition.tiers[tierId];
+                    const hours = (state.fsas?.hoursByTier || INITIAL_STATE.fsas!.hoursByTier)[tierId] || [0, 0, 0, 0, 0];
+                    const shortLabels: Record<string, string> = {
+                      tuitionFT: 'FT (5 day)',
+                      tuition4Day: '4-day',
+                      tuition3Day: '3-day',
+                      tuition2Day: '2-day',
+                      tuition1Day: '1-day',
+                      tuitionHalfDay: 'Half-day'
+                    };
+                    return (
+                      <tr key={tierId} className="border-b border-slate-800/40 hover:bg-slate-800/20 transition-all">
+                        <td className="px-4 py-3 font-medium text-slate-200">{shortLabels[tierId] ?? tier?.label}</td>
+                        <td className="px-4 py-3 text-right font-mono text-slate-300">{tier?.qty ?? 0}</td>
+                        {[0, 1, 2, 3, 4].map((dayIdx) => (
+                          <td key={dayIdx} className="px-2 py-2">
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.5}
+                              value={hours[dayIdx] === 0 ? '' : hours[dayIdx]}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value) || 0;
+                                setState(s => {
+                                  const fsas = s.fsas || INITIAL_STATE.fsas!;
+                                  const next = [...(fsas.hoursByTier[tierId] || [0, 0, 0, 0, 0])];
+                                  next[dayIdx] = val;
+                                  return { ...s, fsas: { ...fsas, hoursByTier: { ...fsas.hoursByTier, [tierId]: next } } };
+                                });
+                              }}
+                              className="w-14 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-center text-xs font-mono text-white focus:border-amber-500 outline-none"
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot className="bg-slate-950/80 font-bold border-t border-slate-700 text-[10px] uppercase text-slate-500 tracking-widest">
+                  <tr>
+                    <td className="px-4 py-3">Sub-total (hrs/day)</td>
+                    <td className="px-4 py-3 text-right">—</td>
+                    {[0, 1, 2, 3, 4].map((dayIdx) => {
+                      const dayTotal = TIER_ORDER.reduce((sum, tierId) => {
+                        const tier = state.tuition.tiers[tierId] || INITIAL_STATE.tuition.tiers[tierId];
+                        const hours = (state.fsas?.hoursByTier || INITIAL_STATE.fsas!.hoursByTier)[tierId] || [0, 0, 0, 0, 0];
+                        return sum + (tier?.qty || 0) * (hours[dayIdx] || 0);
+                      }, 0);
+                      return (
+                        <td key={dayIdx} className="px-4 py-3 text-center font-mono text-teal-400">{dayTotal > 0 ? dayTotal.toFixed(1) : '—'}</td>
+                      );
+                    })}
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </section>
+        </div>
+
         {/* Revenue Section */}
         <div className={`${activeTab === 'revenue' ? 'block' : 'hidden'} print-section space-y-2`}>
            <h2 className="text-lg font-bold text-white uppercase tracking-tighter mb-1">Revenue Sources</h2>
-           <SmartTable items={financials.processedRevenue} type="revenue" onUpdate={(id, f, v) => handleLineItemUpdate('revenue', id, f, v)} onAdd={() => handleAddItem('revenue')} onDelete={(id) => handleDeleteItem('revenue', id)} onMoveUp={(id) => handleMoveItem('revenue', id, 'up')} onMoveDown={(id) => handleMoveItem('revenue', id, 'down')} readOnlyIds={['tuition']} />
+           <SmartTable items={financials.processedRevenue} type="revenue" onUpdate={(id, f, v) => handleLineItemUpdate('revenue', id, f, v)} onAdd={() => handleAddItem('revenue')} onDelete={(id) => handleDeleteItem('revenue', id)} onMoveUp={(id) => handleMoveItem('revenue', id, 'up')} onMoveDown={(id) => handleMoveItem('revenue', id, 'down')} readOnlyIds={['tuition', 'r_afterschool']} />
         </div>
 
         {/* Budget Section */}
