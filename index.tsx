@@ -179,7 +179,7 @@ const provider = new GoogleAuthProvider();
 
 const DOC_ID = "fy27_master_plan";
 
-export const loginWithGoogle = async () => {
+export const loginWithGoogle = async (): Promise<{ email?: string; photoURL?: string } | null> => {
     try {
         const result = await signInWithPopup(auth, provider);
         return result.user;
@@ -738,7 +738,7 @@ export default function App() {
         
         <nav className="flex items-center space-x-1 bg-slate-950 rounded-full p-1 border border-slate-800/50">
           {[
-            { id: 'strategy', label: 'STRATEGY', short: 'STRAT' },
+            { id: 'strategy', label: 'TUITION', short: 'TUIT' },
             { id: 'fsas', label: 'FSAS', short: 'FSAS' },
             { id: 'revenue', label: 'REVENUE', short: 'REV' },
             { id: 'budget', label: 'BUDGET', short: 'BUDG' }
@@ -1111,7 +1111,7 @@ export default function App() {
             <span className="text-slate-500">
               Sundrop Finance FY27 - Updated
               {lastSaved && (
-                <> {lastSaved.toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })} EST</>
+                <> {lastSaved.toLocaleString('en-US', { timeZone: 'America/New_York', month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</>
               )}
             </span>
             <span className="text-teal-900">SYSTEM READY</span>
