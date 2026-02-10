@@ -40,10 +40,17 @@ export interface DiscountTier {
   totalDiscountValue?: number; // Helper for display
 }
 
-/** FSAS: hours per tier per day [Mon, Tue, Wed, Thu, Fri] */
+/** FSAS: Primary / RAPS / Drop In columns with daily rate and learners per tier */
+export type FSASColumnId = 'primary' | 'raps' | 'dropIn';
+
+export interface FSASColumnState {
+  dailyRate: number;
+  learnersByTier: Record<string, number>;
+}
+
 export interface FSASState {
-  dollarPerHour: number;
-  hoursByTier: Record<string, number[]>;
+  schoolDaysPerYear: number;
+  columns: Record<FSASColumnId, FSASColumnState>;
 }
 
 export interface FinancialState {
@@ -66,6 +73,27 @@ export const CARDS = {
 };
 
 const TIER_ORDER = ['tuitionFT', 'tuition4Day', 'tuition3Day', 'tuition2Day', 'tuition1Day', 'tuitionHalfDay'];
+
+/** Days per week for each tier (for FSAS weekly revenue) */
+const TIER_DAYS_PER_WEEK: Record<string, number> = {
+  tuitionFT: 5,
+  tuition4Day: 4,
+  tuition3Day: 3,
+  tuition2Day: 2,
+  tuition1Day: 1,
+  tuitionHalfDay: 5,
+};
+
+const FSAS_COLUMN_IDS: FSASColumnId[] = ['primary', 'raps', 'dropIn'];
+
+const createEmptyFsasLearnersByTier = (): Record<string, number> =>
+  TIER_ORDER.reduce((acc, id) => ({ ...acc, [id]: 0 }), {} as Record<string, number>);
+
+const createInitialFsasColumns = (): Record<FSASColumnId, FSASColumnState> => ({
+  primary: { dailyRate: 0, learnersByTier: createEmptyFsasLearnersByTier() },
+  raps: { dailyRate: 0, learnersByTier: createEmptyFsasLearnersByTier() },
+  dropIn: { dailyRate: 0, learnersByTier: createEmptyFsasLearnersByTier() },
+});
 
 // ==========================================
 // CONSTANTS
@@ -155,8 +183,8 @@ export const INITIAL_STATE: FinancialState = {
   revenueItems: BASELINE_REVENUE,
   budgetItems: BASELINE_BUDGET,
   fsas: {
-    dollarPerHour: 0,
-    hoursByTier: TIER_ORDER.reduce((acc, id) => ({ ...acc, [id]: [0, 0, 0, 0, 0] }), {} as Record<string, number[]>)
+    schoolDaysPerYear: 180,
+    columns: createInitialFsasColumns(),
   }
 };
 
@@ -234,7 +262,23 @@ export const loadState = async (): Promise<FinancialState | null> => {
 
       const baseFsas = INITIAL_STATE.fsas!;
       const mergedFsas = data.fsas
-        ? { dollarPerHour: data.fsas.dollarPerHour ?? baseFsas.dollarPerHour, hoursByTier: { ...baseFsas.hoursByTier, ...data.fsas.hoursByTier } }
+        ? {
+            schoolDaysPerYear: data.fsas.schoolDaysPerYear ?? baseFsas.schoolDaysPerYear,
+            columns: {
+              primary: {
+                dailyRate: data.fsas.columns?.primary?.dailyRate ?? baseFsas.columns.primary.dailyRate,
+                learnersByTier: { ...baseFsas.columns.primary.learnersByTier, ...data.fsas.columns?.primary?.learnersByTier },
+              },
+              raps: {
+                dailyRate: data.fsas.columns?.raps?.dailyRate ?? baseFsas.columns.raps.dailyRate,
+                learnersByTier: { ...baseFsas.columns.raps.learnersByTier, ...data.fsas.columns?.raps?.learnersByTier },
+              },
+              dropIn: {
+                dailyRate: data.fsas.columns?.dropIn?.dailyRate ?? baseFsas.columns.dropIn.dailyRate,
+                learnersByTier: { ...baseFsas.columns.dropIn.learnersByTier, ...data.fsas.columns?.dropIn?.learnersByTier },
+              },
+            },
+          }
         : baseFsas;
 
       return {
@@ -279,7 +323,23 @@ export const subscribeToState = (callback: (state: FinancialState) => void) => {
 
              const baseFsas = INITIAL_STATE.fsas!;
              const mergedFsas = data.fsas
-               ? { dollarPerHour: data.fsas.dollarPerHour ?? baseFsas.dollarPerHour, hoursByTier: { ...baseFsas.hoursByTier, ...data.fsas.hoursByTier } }
+               ? {
+                   schoolDaysPerYear: data.fsas.schoolDaysPerYear ?? baseFsas.schoolDaysPerYear,
+                   columns: {
+                     primary: {
+                       dailyRate: data.fsas.columns?.primary?.dailyRate ?? baseFsas.columns.primary.dailyRate,
+                       learnersByTier: { ...baseFsas.columns.primary.learnersByTier, ...data.fsas.columns?.primary?.learnersByTier },
+                     },
+                     raps: {
+                       dailyRate: data.fsas.columns?.raps?.dailyRate ?? baseFsas.columns.raps.dailyRate,
+                       learnersByTier: { ...baseFsas.columns.raps.learnersByTier, ...data.fsas.columns?.raps?.learnersByTier },
+                     },
+                     dropIn: {
+                       dailyRate: data.fsas.columns?.dropIn?.dailyRate ?? baseFsas.columns.dropIn.dailyRate,
+                       learnersByTier: { ...baseFsas.columns.dropIn.learnersByTier, ...data.fsas.columns?.dropIn?.learnersByTier },
+                     },
+                   },
+                 }
                : baseFsas;
 
              const merged = {
@@ -348,15 +408,21 @@ export const calculateFinancials = (state: FinancialState) => {
 
   const netTuition = totalTuitionGross - totalDiscounts;
 
-  // FSAS yearly revenue: each cell = total kid-hours per day (Children × Hours). Sum all cells for week; * 36 weeks * $/hr
-  const FSAS_WEEKS = 36;
+  // FSAS yearly revenue: per (tier, column) weekly = learners × dailyRate × daysPerWeek; sum all; yearly = weekly × (schoolDaysPerYear/5)
   const fsasState = state.fsas || INITIAL_STATE.fsas!;
-  let fsasTotalHoursPerWeek = 0;
-  TIER_ORDER.forEach((tierId) => {
-    const hours = fsasState.hoursByTier[tierId] || [0, 0, 0, 0, 0];
-    fsasTotalHoursPerWeek += hours[0] + hours[1] + hours[2] + hours[3] + hours[4];
+  const schoolDays = fsasState.schoolDaysPerYear || 180;
+  let fsasWeeklyTotal = 0;
+  FSAS_COLUMN_IDS.forEach((colId) => {
+    const col = fsasState.columns[colId];
+    if (!col) return;
+    const rate = col.dailyRate || 0;
+    TIER_ORDER.forEach((tierId) => {
+      const learners = col.learnersByTier[tierId] || 0;
+      const daysPerWeek = TIER_DAYS_PER_WEEK[tierId] ?? 5;
+      fsasWeeklyTotal += learners * rate * daysPerWeek;
+    });
   });
-  const fsasYearlyRevenue = fsasTotalHoursPerWeek * FSAS_WEEKS * (fsasState.dollarPerHour || 0);
+  const fsasYearlyRevenue = fsasWeeklyTotal * (schoolDays / 5);
 
   // 3. Revenue
   let totalRevenue = 0;
@@ -996,47 +1062,100 @@ export default function App() {
             </h2>
             <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-4">Feeds 101-405 Afterschool Program Revenue</p>
 
-            <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest mb-4">Enter the total number of estimated Child-Hours per day (Children × # of Hours).</p>
+            <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest mb-4">Set daily rate per program; enter # of learners per tier. Weekly = learners × rate × days/week; yearly uses school days.</p>
 
             <div className="bg-slate-950/80 p-4 md:p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row gap-4 md:gap-8 items-center justify-between mb-6">
-              <div className="flex-1 w-full">
-                <label className="text-[9px] text-amber-500 font-bold uppercase tracking-widest mb-2 block">Total $/hr (Rate)</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-2xl font-light">$</span>
-                  <input
-                    type="number"
-                    value={state.fsas?.dollarPerHour ?? ''}
-                    onChange={(e) => setState(s => ({
-                      ...s,
-                      fsas: { ...(s.fsas || INITIAL_STATE.fsas!), dollarPerHour: parseFloat(e.target.value) || 0 }
-                    }))}
-                    className="w-full bg-slate-900 border-2 border-slate-800 text-3xl font-bold text-white pl-10 pr-4 py-2 rounded-xl focus:border-amber-500 outline-none"
-                  />
-                </div>
+              <div className="flex-1 w-full max-w-xs">
+                <label className="text-[9px] text-amber-500 font-bold uppercase tracking-widest mb-2 block"># of school days per year</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={state.fsas?.schoolDaysPerYear ?? 180}
+                  onChange={(e) => setState(s => ({
+                    ...s,
+                    fsas: { ...(s.fsas || INITIAL_STATE.fsas!), schoolDaysPerYear: parseInt(e.target.value, 10) || 180 }
+                  }))}
+                  className="w-full bg-slate-900 border-2 border-slate-800 text-xl font-bold text-white px-4 py-2 rounded-xl focus:border-amber-500 outline-none"
+                />
               </div>
               <div className="text-right w-full md:w-auto">
-                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">FY27 Afterschool Revenue</p>
+                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">FY27 Afterschool Revenue (FSAS Total)</p>
                 <p className="text-2xl font-bold text-teal-400">${Math.round(financials.processedRevenue.find(i => i.id === 'r_afterschool')?.finalValue || 0).toLocaleString()}</p>
               </div>
             </div>
 
             <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/80">
-              <table className="w-full text-sm text-slate-300 table-fixed">
+              <table className="w-full text-sm text-slate-300 min-w-[720px]">
                 <thead className="text-[10px] uppercase bg-slate-950/80 text-slate-500 font-bold tracking-widest border-b border-slate-800">
                   <tr>
-                    <th className="py-3 text-center w-[14.28%]">Tier</th>
-                    <th className="py-3 text-center w-[14.28%]"># Students</th>
-                    <th className="py-3 text-center w-[14.28%]">Mon</th>
-                    <th className="py-3 text-center w-[14.28%]">Tue</th>
-                    <th className="py-3 text-center w-[14.28%]">Wed</th>
-                    <th className="py-3 text-center w-[14.28%]">Thu</th>
-                    <th className="py-3 text-center w-[14.28%]">Fri</th>
+                    <th className="py-3 text-center w-24">Tier</th>
+                    <th className="py-3 text-center w-20"># Learners</th>
+                    {FSAS_COLUMN_IDS.map((colId) => (
+                      <th key={colId} colSpan={3} className="py-2 text-center border-l border-slate-800/60">
+                        {colId === 'primary' ? 'Primary' : colId === 'raps' ? 'RAPS' : 'Drop In'}
+                      </th>
+                    ))}
+                    <th className="py-3 text-center w-24 border-l border-slate-800/60">Tier total</th>
+                  </tr>
+                  <tr className="border-b border-slate-800/60">
+                    <th className="py-1"></th>
+                    <th className="py-1">(ref)</th>
+                    {FSAS_COLUMN_IDS.map((colId) => (
+                      <React.Fragment key={colId}>
+                        <th className="py-1 text-[9px] border-l border-slate-800/40">$/day</th>
+                        <th className="py-1 text-[9px]">#</th>
+                        <th className="py-1 text-[9px]">Sub $</th>
+                      </React.Fragment>
+                    ))}
+                    <th className="py-1 border-l border-slate-800/60"></th>
+                  </tr>
+                  <tr className="border-b border-slate-800/60 bg-slate-900/40">
+                    <td className="py-1"></td>
+                    <td className="py-1"></td>
+                    {FSAS_COLUMN_IDS.map((colId) => {
+                      const fsas = state.fsas || INITIAL_STATE.fsas!;
+                      const rate = fsas.columns[colId]?.dailyRate ?? 0;
+                      return (
+                        <React.Fragment key={colId}>
+                          <td className="py-1.5 text-center border-l border-slate-800/40">
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.5}
+                              value={rate === 0 ? '' : rate}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value) || 0;
+                                setState(s => {
+                                  const nextFsas = s.fsas || INITIAL_STATE.fsas!;
+                                  return {
+                                    ...s,
+                                    fsas: {
+                                      ...nextFsas,
+                                      columns: {
+                                        ...nextFsas.columns,
+                                        [colId]: { ...nextFsas.columns[colId], dailyRate: val },
+                                      },
+                                    },
+                                  };
+                                });
+                              }}
+                              placeholder="0"
+                              className="w-full max-w-[4rem] mx-auto block bg-slate-900 border border-slate-700 rounded px-2 py-1 text-center text-xs font-mono text-white focus:border-amber-500 outline-none"
+                            />
+                          </td>
+                          <td className="py-1"></td>
+                          <td className="py-1"></td>
+                        </React.Fragment>
+                      );
+                    })}
+                    <td className="py-1 border-l border-slate-800/60"></td>
                   </tr>
                 </thead>
                 <tbody>
                   {TIER_ORDER.map((tierId) => {
                     const tier = state.tuition.tiers[tierId] || INITIAL_STATE.tuition.tiers[tierId];
-                    const hours = (state.fsas?.hoursByTier || INITIAL_STATE.fsas!.hoursByTier)[tierId] || [0, 0, 0, 0, 0];
+                    const fsas = state.fsas || INITIAL_STATE.fsas!;
                     const shortLabels: Record<string, string> = {
                       tuitionFT: 'FT (5 day)',
                       tuition4Day: '4-day',
@@ -1045,47 +1164,89 @@ export default function App() {
                       tuition1Day: '1-day',
                       tuitionHalfDay: 'Half-day'
                     };
+                    const daysPerWeek = TIER_DAYS_PER_WEEK[tierId] ?? 5;
+                    let rowTotal = 0;
                     return (
                       <tr key={tierId} className="border-b border-slate-800/40 hover:bg-slate-800/20 transition-all">
                         <td className="py-3 text-center font-medium text-slate-200">{shortLabels[tierId] ?? tier?.label}</td>
-                        <td className="py-3 text-center font-mono text-slate-300">{tier?.qty ?? 0}</td>
-                        {[0, 1, 2, 3, 4].map((dayIdx) => (
-                          <td key={dayIdx} className="py-2 text-center">
-                            <input
-                              type="number"
-                              min={0}
-                              step={0.5}
-                              value={hours[dayIdx] === 0 ? '' : hours[dayIdx]}
-                              onChange={(e) => {
-                                const val = parseFloat(e.target.value) || 0;
-                                setState(s => {
-                                  const fsas = s.fsas || INITIAL_STATE.fsas!;
-                                  const next = [...(fsas.hoursByTier[tierId] || [0, 0, 0, 0, 0])];
-                                  next[dayIdx] = val;
-                                  return { ...s, fsas: { ...fsas, hoursByTier: { ...fsas.hoursByTier, [tierId]: next } } };
-                                });
-                              }}
-                              className="w-full max-w-[4rem] mx-auto block bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-center text-xs font-mono text-white focus:border-amber-500 outline-none"
-                            />
-                          </td>
-                        ))}
+                        <td className="py-3 text-center font-mono text-slate-400">{tier?.qty ?? 0}</td>
+                        {FSAS_COLUMN_IDS.map((colId) => {
+                          const col = fsas.columns[colId];
+                          const rate = col?.dailyRate ?? 0;
+                          const learners = col?.learnersByTier?.[tierId] ?? 0;
+                          const subTotal = learners * rate * daysPerWeek;
+                          rowTotal += subTotal;
+                          return (
+                            <React.Fragment key={colId}>
+                              <td className="py-2 text-center border-l border-slate-800/40 font-mono text-slate-500 text-xs">${rate > 0 ? rate : '—'}</td>
+                              <td className="py-2 text-center">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={learners === 0 ? '' : learners}
+                                  onChange={(e) => {
+                                    const val = parseInt(e.target.value, 10) || 0;
+                                    setState(s => {
+                                      const nextFsas = s.fsas || INITIAL_STATE.fsas!;
+                                      const nextLearners = { ...nextFsas.columns[colId].learnersByTier, [tierId]: val };
+                                      return {
+                                        ...s,
+                                        fsas: {
+                                          ...nextFsas,
+                                          columns: {
+                                            ...nextFsas.columns,
+                                            [colId]: {
+                                              ...nextFsas.columns[colId],
+                                              learnersByTier: nextLearners,
+                                            },
+                                          },
+                                        },
+                                      };
+                                    });
+                                  }}
+                                  className="w-full max-w-[3rem] mx-auto block bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-center text-xs font-mono text-white focus:border-amber-500 outline-none"
+                                />
+                              </td>
+                              <td className="py-2 text-center font-mono text-teal-400">{subTotal > 0 ? `$${Math.round(subTotal).toLocaleString()}` : '—'}</td>
+                            </React.Fragment>
+                          );
+                        })}
+                        <td className="py-3 text-center font-mono font-bold text-teal-400 border-l border-slate-800/60">{rowTotal > 0 ? `$${Math.round(rowTotal).toLocaleString()}` : '—'}</td>
                       </tr>
                     );
                   })}
                 </tbody>
                 <tfoot className="bg-slate-950/80 font-bold border-t border-slate-700 text-[10px] uppercase text-slate-500 tracking-widest">
                   <tr>
-                    <td className="py-3 text-center">Sub-total (hrs/day)</td>
+                    <td className="py-3 text-center">Sub-total (weekly)</td>
                     <td className="py-3 text-center">—</td>
-                    {[0, 1, 2, 3, 4].map((dayIdx) => {
-                      const dayTotal = TIER_ORDER.reduce((sum, tierId) => {
-                        const hours = (state.fsas?.hoursByTier || INITIAL_STATE.fsas!.hoursByTier)[tierId] || [0, 0, 0, 0, 0];
-                        return sum + (hours[dayIdx] || 0);
+                    {FSAS_COLUMN_IDS.map((colId) => {
+                      const fsas = state.fsas || INITIAL_STATE.fsas!;
+                      const col = fsas.columns[colId];
+                      const rate = col?.dailyRate ?? 0;
+                      const colWeekly = TIER_ORDER.reduce((sum, tierId) => {
+                        const learners = col?.learnersByTier?.[tierId] ?? 0;
+                        const daysPerWeek = TIER_DAYS_PER_WEEK[tierId] ?? 5;
+                        return sum + learners * rate * daysPerWeek;
                       }, 0);
                       return (
-                        <td key={dayIdx} className="py-3 text-center font-mono text-teal-400">{dayTotal > 0 ? dayTotal.toFixed(1) : '—'}</td>
+                        <td key={colId} colSpan={3} className="py-3 text-center font-mono text-teal-400 border-l border-slate-800/60">
+                          {colWeekly > 0 ? `$${Math.round(colWeekly).toLocaleString()}` : '—'}
+                        </td>
                       );
                     })}
+                    <td className="py-3 text-center font-mono text-teal-400 border-l border-slate-800/60">
+                      ${Math.round(
+                        FSAS_COLUMN_IDS.reduce((sum, colId) => {
+                          const col = (state.fsas || INITIAL_STATE.fsas!).columns[colId];
+                          const rate = col?.dailyRate ?? 0;
+                          return sum + TIER_ORDER.reduce((s, tierId) => {
+                            const learners = col?.learnersByTier?.[tierId] ?? 0;
+                            return s + learners * rate * (TIER_DAYS_PER_WEEK[tierId] ?? 5);
+                          }, 0);
+                        }, 0)
+                      ).toLocaleString()}
+                    </td>
                   </tr>
                 </tfoot>
               </table>
