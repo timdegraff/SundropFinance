@@ -86,6 +86,27 @@ const TIER_DAYS_PER_WEEK: Record<string, number> = {
 
 const FSAS_COLUMN_IDS: FSASColumnId[] = ['primary', 'raps', 'dropIn'];
 
+/** Set to true in DevTools console (window.__DEBUG_FSAS = true) to log FSAS save/merge */
+declare global { interface Window { __DEBUG_FSAS?: boolean } }
+
+function fsasHasContent(fsas: FSASState | undefined): boolean {
+  if (!fsas?.columns) return false;
+  for (const colId of FSAS_COLUMN_IDS) {
+    const col = fsas.columns[colId];
+    if (!col) continue;
+    if (Number(col.dailyRate) > 0) return true;
+    const learners = col.learnersByTier;
+    if (learners && typeof learners === 'object')
+      for (const k of Object.keys(learners))
+        if (Number(learners[k]) > 0) return true;
+  }
+  return false;
+}
+
+function fsasIsEmpty(fsas: FSASState | undefined): boolean {
+  return !fsasHasContent(fsas);
+}
+
 const createEmptyFsasLearnersByTier = (): Record<string, number> =>
   TIER_ORDER.reduce((acc, id) => ({ ...acc, [id]: 0 }), {} as Record<string, number>);
 
@@ -223,6 +244,9 @@ export const logout = async () => {
 
 export const saveState = async (state: FinancialState) => {
   try {
+    if (typeof window !== 'undefined' && window.__DEBUG_FSAS) {
+      console.log('[FSAS debug] saveState called, fsas has content:', fsasHasContent(state.fsas), 'fsas:', JSON.stringify(state.fsas?.columns));
+    }
     await setDoc(doc(db, "plans", DOC_ID), state);
     console.log("State saved to Firebase");
     return true;
@@ -324,6 +348,9 @@ export const subscribeToState = (callback: (state: FinancialState) => void) => {
 
              const baseFsas = INITIAL_STATE.fsas!;
              const hasNewFsasShape = data.fsas && typeof data.fsas === 'object' && data.fsas.columns && typeof data.fsas.columns === 'object';
+             if (typeof window !== 'undefined' && window.__DEBUG_FSAS) {
+               console.log('[FSAS debug] subscription raw data.fsas:', data.fsas ? JSON.stringify(data.fsas) : 'missing', 'hasNewFsasShape:', hasNewFsasShape);
+             }
              const mergedFsas: FSASState = !hasNewFsasShape
                ? baseFsas
                : {
@@ -660,9 +687,19 @@ export default function App() {
           const unsubscribe = subscribeToState((newData) => {
               const now = Date.now();
               if (now - lastSaveTimestampRef.current < 5000) {
+                if (typeof window !== 'undefined' && window.__DEBUG_FSAS) console.log('[FSAS debug] subscription: skipped (within 5s of save)');
                 return;
               }
-              setState(newData);
+              setState((prev) => {
+                const incomingEmpty = fsasIsEmpty(newData.fsas);
+                const prevHasContent = fsasHasContent(prev.fsas);
+                if (incomingEmpty && prevHasContent) {
+                  if (typeof window !== 'undefined' && window.__DEBUG_FSAS) console.log('[FSAS debug] subscription: keeping LOCAL fsas (incoming empty, we have content)');
+                  return { ...newData, fsas: prev.fsas };
+                }
+                if (typeof window !== 'undefined' && window.__DEBUG_FSAS) console.log('[FSAS debug] subscription: applying remote', { incomingEmpty, prevHasContent });
+                return newData;
+              });
               setLastSaved(new Date());
           });
           return () => unsubscribe();
