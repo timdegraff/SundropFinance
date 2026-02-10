@@ -261,25 +261,26 @@ export const loadState = async (): Promise<FinancialState | null> => {
       }
 
       const baseFsas = INITIAL_STATE.fsas!;
-      const mergedFsas = data.fsas
-        ? {
-            schoolDaysPerYear: data.fsas.schoolDaysPerYear ?? baseFsas.schoolDaysPerYear,
+      const hasNewFsasShape = data.fsas && typeof data.fsas === 'object' && data.fsas.columns && typeof data.fsas.columns === 'object';
+      const mergedFsas: FSASState = !hasNewFsasShape
+        ? baseFsas
+        : {
+            schoolDaysPerYear: Number(data.fsas!.schoolDaysPerYear) || baseFsas.schoolDaysPerYear,
             columns: {
               primary: {
-                dailyRate: data.fsas.columns?.primary?.dailyRate ?? baseFsas.columns.primary.dailyRate,
-                learnersByTier: { ...baseFsas.columns.primary.learnersByTier, ...data.fsas.columns?.primary?.learnersByTier },
+                dailyRate: Number((data.fsas!.columns as any)?.primary?.dailyRate) || baseFsas.columns.primary.dailyRate,
+                learnersByTier: TIER_ORDER.reduce((acc, id) => ({ ...acc, [id]: Number((data.fsas!.columns as any)?.primary?.learnersByTier?.[id]) || 0 }), {} as Record<string, number>),
               },
               raps: {
-                dailyRate: data.fsas.columns?.raps?.dailyRate ?? baseFsas.columns.raps.dailyRate,
-                learnersByTier: { ...baseFsas.columns.raps.learnersByTier, ...data.fsas.columns?.raps?.learnersByTier },
+                dailyRate: Number((data.fsas!.columns as any)?.raps?.dailyRate) || baseFsas.columns.raps.dailyRate,
+                learnersByTier: TIER_ORDER.reduce((acc, id) => ({ ...acc, [id]: Number((data.fsas!.columns as any)?.raps?.learnersByTier?.[id]) || 0 }), {} as Record<string, number>),
               },
               dropIn: {
-                dailyRate: data.fsas.columns?.dropIn?.dailyRate ?? baseFsas.columns.dropIn.dailyRate,
-                learnersByTier: { ...baseFsas.columns.dropIn.learnersByTier, ...data.fsas.columns?.dropIn?.learnersByTier },
+                dailyRate: Number((data.fsas!.columns as any)?.dropIn?.dailyRate) || baseFsas.columns.dropIn.dailyRate,
+                learnersByTier: TIER_ORDER.reduce((acc, id) => ({ ...acc, [id]: Number((data.fsas!.columns as any)?.dropIn?.learnersByTier?.[id]) || 0 }), {} as Record<string, number>),
               },
             },
-          }
-        : baseFsas;
+          };
 
       return {
         ...INITIAL_STATE,
@@ -322,25 +323,26 @@ export const subscribeToState = (callback: (state: FinancialState) => void) => {
              }
 
              const baseFsas = INITIAL_STATE.fsas!;
-             const mergedFsas = data.fsas
-               ? {
-                   schoolDaysPerYear: data.fsas.schoolDaysPerYear ?? baseFsas.schoolDaysPerYear,
+             const hasNewFsasShape = data.fsas && typeof data.fsas === 'object' && data.fsas.columns && typeof data.fsas.columns === 'object';
+             const mergedFsas: FSASState = !hasNewFsasShape
+               ? baseFsas
+               : {
+                   schoolDaysPerYear: Number(data.fsas!.schoolDaysPerYear) || baseFsas.schoolDaysPerYear,
                    columns: {
                      primary: {
-                       dailyRate: data.fsas.columns?.primary?.dailyRate ?? baseFsas.columns.primary.dailyRate,
-                       learnersByTier: { ...baseFsas.columns.primary.learnersByTier, ...data.fsas.columns?.primary?.learnersByTier },
+                       dailyRate: Number((data.fsas!.columns as any)?.primary?.dailyRate) || baseFsas.columns.primary.dailyRate,
+                       learnersByTier: TIER_ORDER.reduce((acc, id) => ({ ...acc, [id]: Number((data.fsas!.columns as any)?.primary?.learnersByTier?.[id]) || 0 }), {} as Record<string, number>),
                      },
                      raps: {
-                       dailyRate: data.fsas.columns?.raps?.dailyRate ?? baseFsas.columns.raps.dailyRate,
-                       learnersByTier: { ...baseFsas.columns.raps.learnersByTier, ...data.fsas.columns?.raps?.learnersByTier },
+                       dailyRate: Number((data.fsas!.columns as any)?.raps?.dailyRate) || baseFsas.columns.raps.dailyRate,
+                       learnersByTier: TIER_ORDER.reduce((acc, id) => ({ ...acc, [id]: Number((data.fsas!.columns as any)?.raps?.learnersByTier?.[id]) || 0 }), {} as Record<string, number>),
                      },
                      dropIn: {
-                       dailyRate: data.fsas.columns?.dropIn?.dailyRate ?? baseFsas.columns.dropIn.dailyRate,
-                       learnersByTier: { ...baseFsas.columns.dropIn.learnersByTier, ...data.fsas.columns?.dropIn?.learnersByTier },
+                       dailyRate: Number((data.fsas!.columns as any)?.dropIn?.dailyRate) || baseFsas.columns.dropIn.dailyRate,
+                       learnersByTier: TIER_ORDER.reduce((acc, id) => ({ ...acc, [id]: Number((data.fsas!.columns as any)?.dropIn?.learnersByTier?.[id]) || 0 }), {} as Record<string, number>),
                      },
                    },
-                 }
-               : baseFsas;
+                 };
 
              const merged = {
                 ...INITIAL_STATE,
