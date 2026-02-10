@@ -1,5 +1,5 @@
 // Sync update: v27.28 - Matrix Discount Logic Integration
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import ReactDOM from "react-dom/client";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -651,12 +651,17 @@ export default function App() {
   const [activeTab, setActiveTab] = useState(CARDS.STRATEGY);
   const [state, setState] = useState<FinancialState>(INITIAL_STATE);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const lastSaveTimestampRef = useRef<number>(0);
 
   useEffect(() => {
     if (user && ALLOWED_EMAILS.includes(user.email)) {
         loadState().then(data => { if (data) setState(data); });
         try {
           const unsubscribe = subscribeToState((newData) => {
+              const now = Date.now();
+              if (now - lastSaveTimestampRef.current < 5000) {
+                return;
+              }
               setState(newData);
               setLastSaved(new Date());
           });
@@ -672,6 +677,7 @@ export default function App() {
     if (!user || !ALLOWED_EMAILS.includes(user.email)) return;
     
     const timer = setTimeout(() => {
+      lastSaveTimestampRef.current = Date.now();
       saveState(state).catch(e => console.error("Auto-save failed", e));
       setLastSaved(new Date());
     }, 2000);
