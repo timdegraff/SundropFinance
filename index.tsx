@@ -1064,7 +1064,7 @@ export default function App() {
 
             <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest mb-4">Set daily rate per program; enter # of learners per tier. Weekly = learners × rate × days/week; yearly uses school days.</p>
 
-            <div className="bg-slate-950/80 p-4 md:p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row gap-4 md:gap-8 items-center justify-between mb-6">
+            <div className="bg-slate-950/80 p-4 md:p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row gap-4 md:gap-8 items-center justify-between mb-6 flex-wrap">
               <div className="flex-1 w-full max-w-xs">
                 <label className="text-[9px] text-amber-500 font-bold uppercase tracking-widest mb-2 block"># of school days per year</label>
                 <input
@@ -1078,6 +1078,15 @@ export default function App() {
                   }))}
                   className="w-full bg-slate-900 border-2 border-slate-800 text-xl font-bold text-white px-4 py-2 rounded-xl focus:border-amber-500 outline-none"
                 />
+              </div>
+              <div className="w-full max-w-xs">
+                <label className="text-[9px] text-amber-500 font-bold uppercase tracking-widest mb-2 block">Total FSAS learners</label>
+                <p className="text-xl font-bold text-white bg-slate-900 border-2 border-slate-800 px-4 py-2 rounded-xl">
+                  {FSAS_COLUMN_IDS.reduce((sum, colId) => {
+                    const col = (state.fsas || INITIAL_STATE.fsas!).columns[colId];
+                    return sum + TIER_ORDER.reduce((s, tierId) => s + (col?.learnersByTier?.[tierId] ?? 0), 0);
+                  }, 0)}
+                </p>
               </div>
               <div className="text-right w-full md:w-auto">
                 <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">FY27 Afterschool Revenue (FSAS Total)</p>
@@ -1105,7 +1114,7 @@ export default function App() {
                       <React.Fragment key={colId}>
                         <th className="py-1 text-[9px] border-l border-slate-800/40">$/day</th>
                         <th className="py-1 text-[9px]">#</th>
-                        <th className="py-1 text-[9px]">Sub $</th>
+                        <th className="py-1 text-[9px]">Daily $</th>
                       </React.Fragment>
                     ))}
                     <th className="py-1 border-l border-slate-800/60"></th>
@@ -1218,7 +1227,7 @@ export default function App() {
                 </tbody>
                 <tfoot className="bg-slate-950/80 font-bold border-t border-slate-700 text-[10px] uppercase text-slate-500 tracking-widest">
                   <tr>
-                    <td className="py-3 text-center">Sub-total (weekly)</td>
+                    <td className="py-3 text-center">Weekly</td>
                     <td className="py-3 text-center">—</td>
                     {FSAS_COLUMN_IDS.map((colId) => {
                       const fsas = state.fsas || INITIAL_STATE.fsas!;
@@ -1245,6 +1254,39 @@ export default function App() {
                             return s + learners * rate * (TIER_DAYS_PER_WEEK[tierId] ?? 5);
                           }, 0);
                         }, 0)
+                      ).toLocaleString()}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-3 text-center">Annual</td>
+                    <td className="py-3 text-center">—</td>
+                    {FSAS_COLUMN_IDS.map((colId) => {
+                      const fsas = state.fsas || INITIAL_STATE.fsas!;
+                      const col = fsas.columns[colId];
+                      const rate = col?.dailyRate ?? 0;
+                      const colWeekly = TIER_ORDER.reduce((sum, tierId) => {
+                        const learners = col?.learnersByTier?.[tierId] ?? 0;
+                        const daysPerWeek = TIER_DAYS_PER_WEEK[tierId] ?? 5;
+                        return sum + learners * rate * daysPerWeek;
+                      }, 0);
+                      const schoolDays = fsas.schoolDaysPerYear ?? 180;
+                      const colAnnual = colWeekly * (schoolDays / 5);
+                      return (
+                        <td key={colId} colSpan={3} className="py-3 text-center font-mono text-teal-400 border-l border-slate-800/60">
+                          {colAnnual > 0 ? `$${Math.round(colAnnual).toLocaleString()}` : '—'}
+                        </td>
+                      );
+                    })}
+                    <td className="py-3 text-center font-mono text-teal-400 border-l border-slate-800/60">
+                      ${Math.round(
+                        (FSAS_COLUMN_IDS.reduce((sum, colId) => {
+                          const col = (state.fsas || INITIAL_STATE.fsas!).columns[colId];
+                          const rate = col?.dailyRate ?? 0;
+                          return sum + TIER_ORDER.reduce((s, tierId) => {
+                            const learners = col?.learnersByTier?.[tierId] ?? 0;
+                            return s + learners * rate * (TIER_DAYS_PER_WEEK[tierId] ?? 5);
+                          }, 0);
+                        }, 0)) * ((state.fsas || INITIAL_STATE.fsas!).schoolDaysPerYear ?? 180) / 5
                       ).toLocaleString()}
                     </td>
                   </tr>
