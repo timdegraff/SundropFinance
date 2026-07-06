@@ -1,7 +1,7 @@
 // Sync update: v27.28 - Matrix Discount Logic Integration
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import ReactDOM from "react-dom/client";
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from "recharts";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -69,6 +69,8 @@ export const CARDS = {
     FSAS: 'fsas',
     REVENUE: 'revenue',
     BUDGET: 'budget',
+    ACTUALS: 'bva',
+    YOY: 'yoy',
     MONTHLY: 'monthly'
 };
 
@@ -667,6 +669,300 @@ export const SmartTable: React.FC<SmartTableProps> = ({ items, type, onUpdate, o
 };
 
 // ==========================================
+// BOARD FINANCIALS (Static FY2026 actuals from official reports)
+// ==========================================
+const RPT_C1 = "#f59e0b"; // amber  — Actual / current year
+const RPT_C2 = "#475569"; // slate  — Budget / prior year
+
+const acct = (n: number) => {
+  const r = Math.round(n || 0);
+  return r < 0 ? `($${Math.abs(r).toLocaleString()})` : `$${r.toLocaleString()}`;
+};
+const signed = (n: number) => {
+  const r = Math.round(n || 0);
+  return `${r < 0 ? "-" : "+"}$${Math.abs(r).toLocaleString()}`;
+};
+const pctStr = (a: number, b: number) => {
+  if (!b) return (a && a !== 0) ? "NEW" : "—";
+  const p = ((a - b) / Math.abs(b)) * 100;
+  return `${p >= 0 ? "+" : ""}${p.toFixed(0)}%`;
+};
+// Green when the movement is good for the org (more revenue / less expense)
+const isFavorable = (kind: string, variance: number) =>
+  kind === "revenue" ? variance >= 0 : variance <= 0;
+
+const BVA_REPORT = {
+  title: "Budget vs Actual",
+  subtitle: "FY2026 · Jul 1, 2025 – Jun 30, 2026",
+  c1: "Actual", c2: "Budget",
+  totalRev: [323272, 262600], totalExp: [358019, 293150], net: [-34747, -30550],
+  source: "Sundrop Montessori Preschool Inc. — Budget to Actuals Report, FY2026.",
+  sections: [
+    { title: "Revenue", short: "Revenue", kind: "revenue", total: [323272, 262600], rows: [
+      ["101-401 Tuition Income", 195207, 207000],
+      ["101-402 Tuition – Tri Share", 3584, 3000],
+      ["101-403 Tuition – SIGMA", 8729, 10000],
+      ["101-405 Late / Meal / Other Fees", 2505, 100],
+      ["101-410 Afterschool Program", 28028, 25000],
+      ["101-539 OIA Revenue", 27351, 6000],
+      ["101-541 Local Grants", 4000, 5500],
+      ["101-670 Scholarships Income", 6320, 0],
+      ["101-671 Fundraising Revenue", 5429, 5000],
+      ["101-672 Retreat Fund Income", 640, 0],
+      ["101-680 Interest Income", 571, 1000],
+      ["101-685 Refunds & Reimbursements", 1533, 0],
+      ["102-540 OST Grant Revenue", 39375, 0],
+    ]},
+    { title: "General Expense (101)", short: "General", kind: "expense", total: [94938, 67950], rows: [
+      ["101-725 Field Trips", 1186, 500],
+      ["101-726 Food & Meals", 3684, 7000],
+      ["101-727 Course Materials", 9968, 11000],
+      ["101-728 Office Supplies", 876, 2000],
+      ["101-729 Software & Apps", 6915, 1500],
+      ["101-730 Memberships & Subs", 41, 500],
+      ["101-731 Shipping & Postage", 821, 100],
+      ["101-732 Health & Safety Supplies", 107, 0],
+      ["101-735 Fundraising Expense", 2713, 1500],
+      ["101-738 Grant Expense", 1794, 0],
+      ["101-739 Retreat Fund Expense", 0, 0],
+      ["101-740 Bank Fees", 384, 250],
+      ["101-760 Licenses", 185, 100],
+      ["101-801 Insurance", 7047, 2000],
+      ["101-802 Legal & Professional", 395, 300],
+      ["101-803 Contracted Services", 7838, 5000],
+      ["101-860 Travel & Training", 6774, 500],
+      ["101-900 Advertising & Marketing", 611, 200],
+      ["101-930 Repairs & Maintenance", 569, 500],
+      ["101-940 Rent", 9338, 10000],
+      ["101-971 Capital Outlay", 33693, 25000],
+    ]},
+    { title: "OST Grant Expense (102)", short: "OST Grant", kind: "expense", total: [39375, 37900], rows: [
+      ["102-702 Wages (Comm Serv)", 14700, 14700],
+      ["102-703 Wages (Custody & Care)", 16969, 17000],
+      ["102-727 Classroom Materials", 5174, 3000],
+      ["102-729 EZ Reports", 450, 0],
+      ["102-904 Rent Expense", 2082, 3200],
+    ]},
+    { title: "Payroll", short: "Payroll", kind: "expense", total: [223706, 187300], rows: [
+      ["101-702 Wages", 196823, 158300],
+      ["101-703 Taxes", 16461, 15000],
+      ["101-704 Health Insurance", 10423, 14000],
+    ]},
+  ],
+};
+
+const YOY_REPORT = {
+  title: "Year over Year",
+  subtitle: "FY2026 vs FY2025 · Statement of Activity",
+  c1: "FY2026", c2: "FY2025",
+  totalRev: [323272, 196426], totalExp: [358469, 243782], net: [-35197, -47356],
+  source: "Sundrop Montessori Preschool Inc. — Statement of Activity, FY2026 vs FY2025.",
+  sections: [
+    { title: "Revenue", short: "Revenue", kind: "revenue", total: [323272, 196426], rows: [
+      ["101-401 Tuition Income", 195207, 140994],
+      ["101-402 Tuition – Tri Share", 3584, 910],
+      ["101-403 Tuition – SIGMA", 8729, 11172],
+      ["101-405 Late / Meal / Other Fees", 2505, 92],
+      ["101-410 Afterschool Program", 28028, 19128],
+      ["101-539 OIA Revenue", 27351, 0],
+      ["101-540 State Grants", 0, 485],
+      ["101-541 Local Grants", 4000, 9958],
+      ["101-580 Donations", 0, 2189],
+      ["101-670 Scholarships Income", 6320, 777],
+      ["101-671 Fundraising Revenue", 5429, 6249],
+      ["101-672 Retreat Fund Income", 640, 0],
+      ["101-680 Interest Income", 571, 3379],
+      ["101-685 Refunds & Reimbursements", 1533, 1093],
+      ["102-540 OST Grant Revenue", 39375, 0],
+    ]},
+    { title: "General Expense (101)", short: "General", kind: "expense", total: [94938, 60885], rows: [
+      ["101-725 Field Trips", 1186, 0],
+      ["101-726 Food & Meals", 3684, 4550],
+      ["101-727 Course Materials", 9968, 12098],
+      ["101-728 Office Supplies", 876, 824],
+      ["101-729 Software & Apps", 6915, 2522],
+      ["101-730 Memberships & Subs", 41, 886],
+      ["101-731 Shipping & Postage", 821, 622],
+      ["101-732 Health & Safety Supplies", 107, 0],
+      ["101-735 Fundraising Expense", 2713, 826],
+      ["101-738 Grant Expense", 1794, 0],
+      ["101-739 Retreat Fund Expense", 0, 0],
+      ["101-740 Bank Fees", 384, 701],
+      ["101-760 Licenses", 185, 209],
+      ["101-801 Insurance", 7047, 1232],
+      ["101-802 Legal & Professional", 395, 0],
+      ["101-803 Contracted Services", 7838, 6220],
+      ["101-860 Travel & Training", 6774, 4276],
+      ["101-900 Advertising & Marketing", 611, 779],
+      ["101-930 Repairs & Maintenance", 569, 534],
+      ["101-940 Rent", 9338, 12260],
+      ["101-971 Capital Outlay", 33693, 11157],
+      ["101-998 Miscellaneous Expense", 0, 1189],
+    ]},
+    { title: "OST Grant Expense (102)", short: "OST Grant", kind: "expense", total: [39825, 0], rows: [
+      ["102-702 Wages (Comm Serv)", 14700, 0],
+      ["102-703 Wages (Custody & Care)", 16969, 0],
+      ["102-727 Classroom Materials", 5624, 0],
+      ["102-729 EZ Reports", 450, 0],
+      ["102-904 Rent Expense", 2082, 0],
+    ]},
+    { title: "Payroll", short: "Payroll", kind: "expense", total: [223706, 182897], rows: [
+      ["101-702 Wages", 196823, 148948],
+      ["101-703 Taxes", 16461, 12350],
+      ["101-704 Health Insurance", 10423, 21598],
+    ]},
+  ],
+};
+
+const VarianceChip = ({ a, b, kind }: { a: number; b: number; kind: string }) => {
+  const v = a - b;
+  const fav = isFavorable(kind, v);
+  const color = v === 0 ? "text-slate-500" : fav ? "text-emerald-400" : "text-rose-400";
+  return <span className={`font-mono ${color}`}>{signed(v)} <span className="opacity-70">{pctStr(a, b)}</span></span>;
+};
+
+const KpiCard = ({ label, a, b, c1, c2, kind, accent }: any) => {
+  const v = a - b;
+  const fav = isFavorable(kind, v);
+  const color = v === 0 ? "text-slate-400" : fav ? "text-emerald-400" : "text-rose-400";
+  return (
+    <div className="p-5 rounded-2xl bg-slate-900/40 border border-slate-800/60 backdrop-blur-sm shadow-xl">
+      <p className="text-[9px] uppercase font-bold text-slate-500 tracking-widest mb-2">{label}</p>
+      <p className={`text-2xl md:text-3xl font-bold ${accent}`}>{acct(a)}</p>
+      <div className="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between">
+        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{c2} {acct(b)}</span>
+        <span className={`text-[11px] font-bold font-mono ${color}`}>{signed(v)} <span className="opacity-70">{pctStr(a, b)}</span></span>
+      </div>
+    </div>
+  );
+};
+
+const BoardReport = ({ report }: { report: any }) => {
+  const chartData = report.sections.map((s: any) => ({
+    name: s.short,
+    [report.c1]: s.total[0],
+    [report.c2]: s.total[1],
+  }));
+
+  const allRows = report.sections.flatMap((s: any) =>
+    s.rows.map((r: any) => ({ label: r[0], a: r[1], b: r[2], kind: s.kind, v: r[1] - r[2] }))
+  );
+  const movers = [...allRows].sort((x, y) => Math.abs(y.v) - Math.abs(x.v)).slice(0, 6);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-end justify-between flex-wrap gap-2">
+        <div>
+          <h2 className="text-2xl font-bold text-white uppercase tracking-tighter flex items-center">
+            <span className="w-1.5 h-7 bg-amber-500 mr-4 rounded-full"></span>{report.title}
+          </h2>
+          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mt-2 ml-6">{report.subtitle}</p>
+        </div>
+        <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-widest">
+          <span className="flex items-center gap-2 text-slate-300"><span className="w-3 h-3 rounded-sm" style={{ background: RPT_C1 }}></span>{report.c1}</span>
+          <span className="flex items-center gap-2 text-slate-400"><span className="w-3 h-3 rounded-sm" style={{ background: RPT_C2 }}></span>{report.c2}</span>
+        </div>
+      </div>
+
+      {/* KPI band */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <KpiCard label={`Total Revenue`} a={report.totalRev[0]} b={report.totalRev[1]} c1={report.c1} c2={report.c2} kind="revenue" accent="text-emerald-400" />
+        <KpiCard label={`Total Expenditures`} a={report.totalExp[0]} b={report.totalExp[1]} c1={report.c1} c2={report.c2} kind="expense" accent="text-rose-400" />
+        <KpiCard label={`Net Revenue`} a={report.net[0]} b={report.net[1]} c1={report.c1} c2={report.c2} kind="revenue" accent={report.net[0] >= 0 ? "text-teal-400" : "text-amber-400"} />
+      </div>
+
+      {/* Chart + movers */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-slate-900/40 border border-slate-800/60 rounded-3xl p-5 md:p-6 shadow-2xl">
+          <h3 className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-4">Category Comparison</h3>
+          <div className="h-[280px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} barGap={4} barCategoryGap="26%">
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                <XAxis dataKey="name" tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: 700 }} axisLine={{ stroke: "#1e293b" }} tickLine={false} />
+                <YAxis tickFormatter={(v: number) => `$${Math.round(v / 1000)}k`} tick={{ fill: "#64748b", fontSize: 10 }} axisLine={false} tickLine={false} width={46} />
+                <Tooltip cursor={{ fill: "rgba(148,163,184,0.06)" }} contentStyle={{ backgroundColor: "#0a0f1d", borderRadius: "12px", border: "1px solid #1e293b", fontSize: "11px" }} itemStyle={{ color: "#e2e8f0" }} labelStyle={{ color: "#94a3b8", fontWeight: 700 }} formatter={(v: number) => acct(v)} />
+                <Legend wrapperStyle={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }} />
+                <Bar dataKey={report.c1} fill={RPT_C1} radius={[4, 4, 0, 0]} />
+                <Bar dataKey={report.c2} fill={RPT_C2} radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="bg-slate-900/40 border border-slate-800/60 rounded-3xl p-5 md:p-6 shadow-xl">
+          <h3 className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-4">Biggest Swings</h3>
+          <div className="space-y-2.5">
+            {movers.map((m: any, i: number) => {
+              const fav = isFavorable(m.kind, m.v);
+              return (
+                <div key={i} className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-bold text-slate-400 truncate">{m.label.replace(/^\d+-\d+\s/, "")}</span>
+                  <span className={`text-[11px] font-bold font-mono shrink-0 ${fav ? "text-emerald-400" : "text-rose-400"}`}>{signed(m.v)}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Detailed table */}
+      <div className="overflow-x-auto rounded-3xl border border-slate-800 bg-slate-900/40 backdrop-blur-xl">
+        <table className="w-full text-sm text-left text-slate-300">
+          <thead className="text-[10px] uppercase bg-slate-950/80 text-slate-500 font-bold tracking-widest border-b border-slate-800">
+            <tr>
+              <th className="px-6 py-3">Line Item</th>
+              <th className="px-6 py-3 text-right">{report.c1}</th>
+              <th className="px-6 py-3 text-right">{report.c2}</th>
+              <th className="px-6 py-3 text-right">Variance</th>
+            </tr>
+          </thead>
+          <tbody>
+            {report.sections.map((s: any) => (
+              <React.Fragment key={s.title}>
+                <tr className="bg-slate-950/50">
+                  <td colSpan={4} className="px-6 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-amber-500">{s.title}</td>
+                </tr>
+                {s.rows.map((r: any, i: number) => (
+                  <tr key={i} className="border-b border-slate-800/40 hover:bg-slate-800/20 transition-all">
+                    <td className="px-6 py-2.5 font-medium text-slate-300">{r[0]}</td>
+                    <td className="px-6 py-2.5 text-right font-mono text-slate-200">{acct(r[1])}</td>
+                    <td className="px-6 py-2.5 text-right font-mono text-slate-500">{acct(r[2])}</td>
+                    <td className="px-6 py-2.5 text-right"><VarianceChip a={r[1]} b={r[2]} kind={s.kind} /></td>
+                  </tr>
+                ))}
+                <tr className="border-b border-slate-700 bg-slate-950/30 font-bold">
+                  <td className="px-6 py-2.5 text-slate-200 uppercase text-[11px] tracking-wide">Total {s.short}</td>
+                  <td className="px-6 py-2.5 text-right font-mono text-white">{acct(s.total[0])}</td>
+                  <td className="px-6 py-2.5 text-right font-mono text-slate-400">{acct(s.total[1])}</td>
+                  <td className="px-6 py-2.5 text-right"><VarianceChip a={s.total[0]} b={s.total[1]} kind={s.kind} /></td>
+                </tr>
+              </React.Fragment>
+            ))}
+          </tbody>
+          <tfoot className="bg-slate-950/80 font-bold border-t-2 border-slate-700">
+            <tr>
+              <td className="px-6 py-3.5 text-slate-200 uppercase text-[11px] tracking-widest">Total Expenditures</td>
+              <td className="px-6 py-3.5 text-right font-mono text-rose-400">{acct(report.totalExp[0])}</td>
+              <td className="px-6 py-3.5 text-right font-mono text-slate-400">{acct(report.totalExp[1])}</td>
+              <td className="px-6 py-3.5 text-right"><VarianceChip a={report.totalExp[0]} b={report.totalExp[1]} kind="expense" /></td>
+            </tr>
+            <tr className="border-t border-slate-800">
+              <td className="px-6 py-3.5 text-white uppercase text-xs tracking-widest">Net Revenue</td>
+              <td className={`px-6 py-3.5 text-right font-mono text-base ${report.net[0] >= 0 ? "text-teal-400" : "text-amber-400"}`}>{acct(report.net[0])}</td>
+              <td className="px-6 py-3.5 text-right font-mono text-slate-400">{acct(report.net[1])}</td>
+              <td className="px-6 py-3.5 text-right"><VarianceChip a={report.net[0]} b={report.net[1]} kind="revenue" /></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <p className="text-[10px] text-slate-600 tracking-wide">Source: {report.source} Variance shown as {report.c1} minus {report.c2}; green favors the school (more revenue / lower spend).</p>
+    </div>
+  );
+};
+
+// ==========================================
 // APP COMPONENT
 // ==========================================
 const COLORS = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899'];
@@ -852,7 +1148,9 @@ export default function App() {
             { id: 'strategy', label: 'TUITION', short: 'TUIT' },
             { id: 'fsas', label: 'FSAS', short: 'FSAS' },
             { id: 'revenue', label: 'REVENUE', short: 'REV' },
-            { id: 'budget', label: 'BUDGET', short: 'BUDG' }
+            { id: 'budget', label: 'BUDGET', short: 'BUDG' },
+            { id: 'bva', label: 'ACTUALS', short: 'ACT' },
+            { id: 'yoy', label: 'YOY', short: 'YOY' }
           ].map((tab) => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-4 md:px-5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-slate-800 text-white shadow-xl' : 'text-slate-500 hover:text-slate-300'}`}>
               <span className="md:hidden">{tab.short}</span>
@@ -1351,6 +1649,16 @@ export default function App() {
         <div className={`${activeTab === 'budget' ? 'block' : 'hidden'} print-section space-y-2`}>
             <h2 className="text-lg font-bold text-white uppercase tracking-tighter mb-1">Expense Ledger</h2>
             <SmartTable items={financials.processedBudget} type="budget" onUpdate={(id, f, v) => handleLineItemUpdate('budget', id, f, v)} onAdd={() => handleAddItem('budget')} onDelete={(id) => handleDeleteItem('budget', id)} onMoveUp={(id) => handleMoveItem('budget', id, 'up')} onMoveDown={(id) => handleMoveItem('budget', id, 'down')} />
+        </div>
+
+        {/* Budget vs Actual Section (FY2026 board report) */}
+        <div className={`${activeTab === 'bva' ? 'block' : 'hidden'} print-section`}>
+            <BoardReport report={BVA_REPORT} />
+        </div>
+
+        {/* Year over Year Section (FY2026 board report) */}
+        <div className={`${activeTab === 'yoy' ? 'block' : 'hidden'} print-section`}>
+            <BoardReport report={YOY_REPORT} />
         </div>
       </main>
 
