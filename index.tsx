@@ -72,7 +72,8 @@ export const CARDS = {
     MONTHLY: 'monthly'
 };
 
-const TIER_ORDER = ['tuitionFT', 'tuition4Day', 'tuition3Day', 'tuition2Day', 'tuition1Day', 'tuitionHalfDay'];
+const TIER_ORDER = ['tuitionFT', 'tuition4Day', 'tuition3Day', 'tuition2Day'];
+// 1-Day and Half-Day tiers retired; old saved data with those keys is ignored (not in TIER_ORDER).
 
 /** Days per week for each tier (for FSAS weekly revenue) */
 const TIER_DAYS_PER_WEEK: Record<string, number> = {
@@ -80,8 +81,6 @@ const TIER_DAYS_PER_WEEK: Record<string, number> = {
   tuition4Day: 4,
   tuition3Day: 3,
   tuition2Day: 2,
-  tuition1Day: 1,
-  tuitionHalfDay: 5,
 };
 
 const FSAS_COLUMN_IDS: FSASColumnId[] = ['primary', 'raps', 'dropIn'];
@@ -97,7 +96,7 @@ function fsasHasContent(fsas: FSASState | undefined): boolean {
     if (Number(col.dailyRate) > 0) return true;
     const learners = col.learnersByTier;
     if (learners && typeof learners === 'object')
-      for (const k of Object.keys(learners))
+      for (const k of TIER_ORDER)
         if (Number(learners[k]) > 0) return true;
   }
   return false;
@@ -168,8 +167,6 @@ const createEmptyAllocations = (): Record<string, DiscountAllocation> => ({
   tuition4Day: { qty: 0, discountPercent: 0 },
   tuition3Day: { qty: 0, discountPercent: 0 },
   tuition2Day: { qty: 0, discountPercent: 0 },
-  tuition1Day: { qty: 0, discountPercent: 0 },
-  tuitionHalfDay: { qty: 0, discountPercent: 0 },
 });
 
 export const INITIAL_STATE: FinancialState = {
@@ -180,8 +177,6 @@ export const INITIAL_STATE: FinancialState = {
       tuition4Day: { id: 'tuition4Day', label: '4-Day Tier', price: 6016, qty: 7, ratio: 80 },
       tuition3Day: { id: 'tuition3Day', label: '3-Day Tier', price: 4512, qty: 4, ratio: 60 },
       tuition2Day: { id: 'tuition2Day', label: '2-Day Tier', price: 3008, qty: 7, ratio: 40 },
-      tuition1Day: { id: 'tuition1Day', label: '1-Day Tier', price: 1504, qty: 5, ratio: 20 },
-      tuitionHalfDay: { id: 'tuitionHalfDay', label: 'Half-Day (5 Days)', price: 3760, qty: 2, ratio: 50 },
     }
   },
   discounts: {
@@ -1214,9 +1209,7 @@ export default function App() {
                       tuitionFT: 'FT (5 day)',
                       tuition4Day: '4-day',
                       tuition3Day: '3-day',
-                      tuition2Day: '2-day',
-                      tuition1Day: '1-day',
-                      tuitionHalfDay: 'Half-day'
+                      tuition2Day: '2-day'
                     };
                     const daysPerWeek = TIER_DAYS_PER_WEEK[tierId] ?? 5;
                     let rowTotal = 0;
