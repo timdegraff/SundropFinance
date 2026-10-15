@@ -72,7 +72,8 @@ export const CARDS = {
     MONTHLY: 'monthly'
 };
 
-const TIER_ORDER = ['tuitionFT', 'tuition4Day', 'tuition3Day', 'tuition2Day', 'tuition1Day', 'tuitionHalfDay'];
+const TIER_ORDER = ['tuitionFT', 'tuition4Day', 'tuition3Day', 'tuition2Day'];
+// 1-Day and Half-Day tiers retired; old saved data with those keys is ignored (not in TIER_ORDER).
 
 /** Days per week for each tier (for FSAS weekly revenue) */
 const TIER_DAYS_PER_WEEK: Record<string, number> = {
@@ -80,8 +81,6 @@ const TIER_DAYS_PER_WEEK: Record<string, number> = {
   tuition4Day: 4,
   tuition3Day: 3,
   tuition2Day: 2,
-  tuition1Day: 1,
-  tuitionHalfDay: 5,
 };
 
 const FSAS_COLUMN_IDS: FSASColumnId[] = ['primary', 'raps', 'dropIn'];
@@ -97,7 +96,7 @@ function fsasHasContent(fsas: FSASState | undefined): boolean {
     if (Number(col.dailyRate) > 0) return true;
     const learners = col.learnersByTier;
     if (learners && typeof learners === 'object')
-      for (const k of Object.keys(learners))
+      for (const k of TIER_ORDER)
         if (Number(learners[k]) > 0) return true;
   }
   return false;
@@ -168,8 +167,6 @@ const createEmptyAllocations = (): Record<string, DiscountAllocation> => ({
   tuition4Day: { qty: 0, discountPercent: 0 },
   tuition3Day: { qty: 0, discountPercent: 0 },
   tuition2Day: { qty: 0, discountPercent: 0 },
-  tuition1Day: { qty: 0, discountPercent: 0 },
-  tuitionHalfDay: { qty: 0, discountPercent: 0 },
 });
 
 export const INITIAL_STATE: FinancialState = {
@@ -180,8 +177,6 @@ export const INITIAL_STATE: FinancialState = {
       tuition4Day: { id: 'tuition4Day', label: '4-Day Tier', price: 6016, qty: 7, ratio: 80 },
       tuition3Day: { id: 'tuition3Day', label: '3-Day Tier', price: 4512, qty: 4, ratio: 60 },
       tuition2Day: { id: 'tuition2Day', label: '2-Day Tier', price: 3008, qty: 7, ratio: 40 },
-      tuition1Day: { id: 'tuition1Day', label: '1-Day Tier', price: 1504, qty: 5, ratio: 20 },
-      tuitionHalfDay: { id: 'tuitionHalfDay', label: 'Half-Day (5 Days)', price: 3760, qty: 2, ratio: 50 },
     }
   },
   discounts: {
@@ -541,7 +536,7 @@ export const SmartTable: React.FC<SmartTableProps> = ({ items, type, onUpdate, o
   const totalFinal = items.reduce((acc, item) => acc + getFinal(item), 0);
    
   return (
-    <div className="overflow-x-auto rounded-3xl border border-slate-800 bg-slate-900/40 backdrop-blur-xl">
+    <div className="sf-scroll sf-ledger overflow-x-auto rounded-3xl border border-slate-800 bg-slate-900/40 backdrop-blur-xl">
       <table className="w-full text-sm text-left text-slate-300">
         <thead className="text-[10px] uppercase bg-slate-950/80 text-slate-500 font-bold tracking-widest border-b border-slate-800">
           <tr>
@@ -841,7 +836,7 @@ export default function App() {
  
   return (
     <div className="min-h-screen pb-20 bg-[#0a0f1d] print:bg-white print:text-black">
-      <header className="sticky top-0 z-50 glass-panel border-b border-slate-800/50 px-6 h-16 flex items-center justify-between no-print">
+      <header className="sf-header sticky top-0 z-50 glass-panel border-b border-slate-800/50 px-6 h-16 flex items-center justify-between no-print">
         <div className="flex items-center space-x-3">
           <div className="w-8 h-8 bg-amber-500 rounded flex items-center justify-center text-black shadow-lg shadow-amber-500/20"><SunIcon className="w-5 h-5" /></div>
           <span className="text-lg font-bold tracking-tight text-white uppercase hidden md:inline">SUNDROP <span className="text-amber-500">FINANCE</span></span>
@@ -854,7 +849,7 @@ export default function App() {
             { id: 'revenue', label: 'REVENUE', short: 'REV' },
             { id: 'budget', label: 'BUDGET', short: 'BUDG' }
           ].map((tab) => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-4 md:px-5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-slate-800 text-white shadow-xl' : 'text-slate-500 hover:text-slate-300'}`}>
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`sf-tab px-4 md:px-5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-slate-800 text-white shadow-xl' : 'text-slate-500 hover:text-slate-300'}`}>
               <span className="md:hidden">{tab.short}</span>
               <span className="hidden md:inline">{tab.label}</span>
             </button>
@@ -869,7 +864,7 @@ export default function App() {
              </span>
            </div>
            <div className="h-10 border-l border-slate-800/50 hidden md:block"></div>
-           <div className="flex items-center gap-3 bg-slate-900/50 rounded-full pl-4 pr-1.5 py-1.5 border border-slate-800/50">
+           <div className="sf-userpill flex items-center gap-3 bg-slate-900/50 rounded-full pl-4 pr-1.5 py-1.5 border border-slate-800/50">
               <div className="text-right hidden sm:block">
                  <p className="text-[10px] font-bold text-white leading-none truncate max-w-[120px]">
                     {user.email}
@@ -878,10 +873,10 @@ export default function App() {
                     ADMINISTRATOR
                  </p>
               </div>
-              <button onClick={handleLogout} className="w-8 h-8 rounded-full flex items-center justify-center bg-slate-950 border border-slate-800 text-slate-500 hover:text-rose-500 transition-all active:scale-95">
+              <button onClick={handleLogout} aria-label="Sign out" className="sf-logout w-8 h-8 rounded-full flex items-center justify-center bg-slate-950 border border-slate-800 text-slate-500 hover:text-rose-500 transition-all active:scale-95">
                  <LogoutIcon />
               </button>
-              <img src={user.photoURL} alt="Profile" className="w-8 h-8 rounded-full border border-amber-500/50 shadow-lg shadow-amber-500/10" />
+              <img src={user.photoURL} alt="Profile" className="sf-avatar w-8 h-8 rounded-full border border-amber-500/50 shadow-lg shadow-amber-500/10" />
            </div>
         </div>
       </header>
@@ -1139,7 +1134,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/80">
+            <div className="sf-scroll sf-fsas overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/80">
               <table className="w-full text-sm text-slate-300 min-w-[720px]">
                 <thead className="text-[10px] uppercase bg-slate-950/80 text-slate-500 font-bold tracking-widest border-b border-slate-800">
                   <tr>
@@ -1214,9 +1209,7 @@ export default function App() {
                       tuitionFT: 'FT (5 day)',
                       tuition4Day: '4-day',
                       tuition3Day: '3-day',
-                      tuition2Day: '2-day',
-                      tuition1Day: '1-day',
-                      tuitionHalfDay: 'Half-day'
+                      tuition2Day: '2-day'
                     };
                     const daysPerWeek = TIER_DAYS_PER_WEEK[tierId] ?? 5;
                     let rowTotal = 0;
@@ -1354,7 +1347,7 @@ export default function App() {
         </div>
       </main>
 
-      <footer className="fixed bottom-0 left-0 w-full bg-slate-950/90 backdrop-blur-xl border-t border-slate-900 py-3 px-6 text-[9px] font-bold text-slate-600 flex justify-between tracking-[0.2em] uppercase z-40 no-print">
+      <footer className="sf-footer fixed bottom-0 left-0 w-full bg-slate-950/90 backdrop-blur-xl border-t border-slate-900 py-3 px-6 text-[9px] font-bold text-slate-600 flex justify-between tracking-[0.2em] uppercase z-40 no-print">
         <div className="flex items-center gap-4">
             <span className="text-slate-500">
               Sundrop Finance FY27 - Updated
