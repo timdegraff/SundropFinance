@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Sundrop Finance FY27</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>☀️</text></svg>">
     
@@ -43,6 +43,35 @@
             .text-white { color: #000 !important; }
             .text-slate-500, .text-slate-400 { color: #666 !important; }
             .border-slate-800 { border-color: #eee !important; }
+        }
+
+        /* ===== Mobile (<768px) only. Desktop (md+) is untouched. ===== */
+        .sf-footer { padding-bottom: calc(0.75rem + env(safe-area-inset-bottom)); }
+        @media (max-width: 767px) {
+            .sf-header { padding-left: max(12px, env(safe-area-inset-left)) !important; padding-right: max(12px, env(safe-area-inset-right)) !important; gap: 8px !important; }
+            .sf-header nav { min-width: 0 !important; }
+            .sf-tab { padding-left: 10px !important; padding-right: 10px !important; min-height: 40px !important; min-width: 44px !important; }
+            .sf-userpill { gap: 6px !important; padding-left: 4px !important; padding-right: 4px !important; }
+            .sf-avatar { display: none !important; }
+            .sf-logout { width: 40px !important; height: 40px !important; }
+            .sf-footer { display: none !important; }
+            main { padding-bottom: calc(2rem + env(safe-area-inset-bottom)) !important; padding-left: max(1rem, env(safe-area-inset-left)) !important; padding-right: max(1rem, env(safe-area-inset-right)) !important; }
+
+            /* No iOS focus-zoom: 16px form text */
+            input:not(#_), select:not(#_), textarea:not(#_) { font-size: 16px !important; }
+
+            /* Readable small text */
+            .text-\[8px\], .text-\[9px\], .text-\[10px\] { font-size: 11px !important; }
+
+            /* Scrollable tables: right-edge fade hint + room to scroll past it */
+            .sf-scroll { -webkit-overflow-scrolling: touch !important; padding-right: 28px !important;
+                -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent) !important;
+                        mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent) !important; }
+            .sf-scroll tr > :first-child { position: sticky !important; left: 0 !important; z-index: 2 !important; background: #0b1222 !important; box-shadow: 1px 0 0 rgba(51,65,85,.6) !important; }
+            .sf-ledger th, .sf-ledger td { padding-left: 12px !important; padding-right: 12px !important; }
+            .sf-ledger tr > :first-child { min-width: 140px !important; max-width: 160px !important; }
+            .sf-ledger input, .sf-fsas input { height: 36px !important; }
+            .sf-fsas input { min-width: 60px !important; }
         }
     </style>
 
