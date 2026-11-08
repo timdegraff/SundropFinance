@@ -36,8 +36,16 @@ export interface DiscountAllocation {
 export interface DiscountTier {
   id: 'staff' | 'sibling' | 'early';
   label: string;
-  allocations: Record<string, DiscountAllocation>; 
+  allocations: Record<string, DiscountAllocation>;
+  // Annual dollar correction. Positive increases this section's discount; negative reduces an over-count.
+  adHocAnnual?: number;
   totalDiscountValue?: number; // Helper for display
+}
+
+export interface OutsideFunding {
+  oia: number;
+  cdc: number;
+  other: number;
 }
 
 /** FSAS: Primary / RAPS / Drop In columns with daily rate and learners per tier */
@@ -59,6 +67,10 @@ export interface FinancialState {
     tiers: Record<string, TuitionTier>;
   };
   discounts: Record<string, DiscountTier>;
+  // Annual dollar discount that is not a percent of a tier (referrals, one-off adjustments).
+  otherDiscountAnnual: number;
+  // Annual tuition dollars paid by outside sources rather than families. Included in net tuition.
+  outsideFunding: OutsideFunding;
   revenueItems: LineItem[];
   budgetItems: LineItem[];
   fsas?: FSASState;
@@ -183,19 +195,24 @@ export const INITIAL_STATE: FinancialState = {
     staff: { 
         id: 'staff', 
         label: 'Staff Discount', 
-        allocations: { ...createEmptyAllocations(), tuitionFT: { qty: 2, discountPercent: 50 } } 
+        allocations: { ...createEmptyAllocations(), tuitionFT: { qty: 2, discountPercent: 50 } },
+        adHocAnnual: 0,
     },
     sibling: { 
         id: 'sibling', 
         label: 'Sibling Discount', 
-        allocations: { ...createEmptyAllocations(), tuitionFT: { qty: 5, discountPercent: 5 }, tuition4Day: { qty: 4, discountPercent: 5 } } 
+        allocations: { ...createEmptyAllocations(), tuitionFT: { qty: 5, discountPercent: 5 }, tuition4Day: { qty: 4, discountPercent: 5 } },
+        adHocAnnual: 0,
     },
     early: { 
         id: 'early', 
         label: 'Pre-Pay', 
-        allocations: createEmptyAllocations() 
+        allocations: createEmptyAllocations(),
+        adHocAnnual: 0,
     },
   },
+  otherDiscountAnnual: 0,
+  outsideFunding: { oia: 0, cdc: 0, other: 0 },
   revenueItems: BASELINE_REVENUE,
   budgetItems: BASELINE_BUDGET,
   fsas: {
@@ -251,6 +268,15 @@ export const saveState = async (state: FinancialState) => {
   }
 };
 
+const annualOrZero = (value: unknown): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : 0;
+
+const mergedOutsideFunding = (data: FinancialState): OutsideFunding => ({
+  oia: annualOrZero(data.outsideFunding?.oia),
+  cdc: annualOrZero(data.outsideFunding?.cdc),
+  other: annualOrZero(data.outsideFunding?.other),
+});
+
 export const loadState = async (): Promise<FinancialState | null> => {
   try {
     const docRef = doc(db, "plans", DOC_ID);
@@ -273,7 +299,8 @@ export const loadState = async (): Promise<FinancialState | null> => {
              if (remoteDisc && remoteDisc.allocations) {
                  mergedDiscounts[dKey] = {
                      ...baseDiscounts[dKey],
-                     allocations: remoteDisc.allocations
+                     allocations: remoteDisc.allocations,
+                     adHocAnnual: annualOrZero(remoteDisc.adHocAnnual),
                  };
              }
           });
@@ -309,7 +336,9 @@ export const loadState = async (): Promise<FinancialState | null> => {
             ...data.tuition
         },
         discounts: mergedDiscounts,
-        fsas: mergedFsas
+        fsas: mergedFsas,
+        otherDiscountAnnual: annualOrZero(data.otherDiscountAnnual),
+        outsideFunding: mergedOutsideFunding(data),
       };
     } else {
       return null;
@@ -335,7 +364,8 @@ export const subscribeToState = (callback: (state: FinancialState) => void) => {
                     if (remoteDisc && remoteDisc.allocations) {
                         mergedDiscounts[dKey] = {
                             ...baseDiscounts[dKey],
-                            allocations: remoteDisc.allocations
+                            allocations: remoteDisc.allocations,
+                            adHocAnnual: annualOrZero(remoteDisc.adHocAnnual),
                         };
                     }
                  });
@@ -374,7 +404,9 @@ export const subscribeToState = (callback: (state: FinancialState) => void) => {
                     ...data.tuition
                 },
                 discounts: mergedDiscounts,
-                fsas: mergedFsas
+                fsas: mergedFsas,
+                otherDiscountAnnual: annualOrZero(data.otherDiscountAnnual),
+                outsideFunding: mergedOutsideFunding(data),
              };
              callback(merged);
         }
@@ -426,11 +458,25 @@ export const calculateFinancials = (state: FinancialState) => {
         }
     });
 
+    // Annual dollar correction on this section. Negative reduces an over-counted percent discount.
+    discTotal += annualOrZero(disc.adHocAnnual);
+
     totalDiscounts += discTotal;
     return { ...disc, totalDiscountValue: discTotal, allocations: allocs };
   });
 
+  // Referrals and other one-off discounts. Not a percent of any tier.
+  const otherDiscountAnnual = annualOrZero(state.otherDiscountAnnual);
+  totalDiscounts += otherDiscountAnnual;
+
   const netTuition = totalTuitionGross - totalDiscounts;
+
+  // Outside funding is tuition revenue paid by OIA / CDC / other sources rather than families.
+  // Those learners are already in gross tuition, so this is a payer split inside net tuition:
+  // it is not a further discount and it is not added on top of tuition revenue.
+  const outside = state.outsideFunding || { oia: 0, cdc: 0, other: 0 };
+  const outsideFundingTotal = annualOrZero(outside.oia) + annualOrZero(outside.cdc) + annualOrZero(outside.other);
+  const familyPaidTuition = netTuition - outsideFundingTotal;
 
   // FSAS yearly revenue: per (tier, column) weekly = learners × dailyRate × daysPerWeek; sum all; yearly = weekly × (schoolDaysPerYear/5)
   const fsasState = state.fsas || INITIAL_STATE.fsas!;
@@ -482,12 +528,63 @@ export const calculateFinancials = (state: FinancialState) => {
     totalTuitionGross,
     totalHeadcount,
     totalDiscounts,
+    otherDiscountAnnual,
     netTuition,
+    outsideFundingTotal,
+    familyPaidTuition,
     totalRevenue,
     totalExpenses,
     netMargin,
     marginPercent
   };
+};
+
+// Discount amounts reduce tuition. A negative discount (ad hoc correction) increases tuition.
+const formatAsDiscount = (amount: number) => {
+  const rounded = Math.round(amount);
+  if (rounded < 0) return `+$${Math.abs(rounded).toLocaleString()}`;
+  return `-$${rounded.toLocaleString()}`;
+};
+
+const formatDollars = (amount: number) => {
+  const rounded = Math.round(amount);
+  const abs = Math.abs(rounded).toLocaleString();
+  return rounded < 0 ? `-$${abs}` : `$${abs}`;
+};
+
+// Controlled dollar field that can be cleared and typed as a negative annual amount.
+const AnnualDollarInput = ({ value, onChange, ariaLabel, id }: { value: number; onChange: (n: number) => void; ariaLabel: string; id?: string }) => {
+  const [draft, setDraft] = useState<string | null>(null);
+  const shown = draft !== null ? draft : (Number.isFinite(value) ? String(value) : '0');
+  return (
+    <div className="relative w-28 shrink-0">
+      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 text-[10px] font-bold">$</span>
+      <input
+        type="text"
+        inputMode="decimal"
+        id={id}
+        aria-label={ariaLabel}
+        value={shown}
+        onFocus={(e) => {
+          const el = e.currentTarget;
+          requestAnimationFrame(() => el.select());
+        }}
+        onChange={(e) => {
+          const raw = e.target.value.replace(/[$,\s]/g, '');
+          if (raw !== '' && !/^-?\d*\.?\d*$/.test(raw)) return;
+          setDraft(raw);
+          if (raw === '' || raw === '-' || raw === '.' || raw === '-.') {
+            onChange(0);
+            return;
+          }
+          const n = parseFloat(raw);
+          if (Number.isFinite(n)) onChange(n);
+        }}
+        onBlur={() => setDraft(null)}
+        className="bg-slate-900 border border-slate-700 focus:border-amber-500 w-full text-right rounded text-[10px] font-bold py-1 pr-2 pl-5 text-white outline-none"
+      />
+    </div>
+  );
 };
 
 // ==========================================
@@ -664,7 +761,7 @@ export const SmartTable: React.FC<SmartTableProps> = ({ items, type, onUpdate, o
 // ==========================================
 // APP COMPONENT
 // ==========================================
-const COLORS = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899'];
+const COLORS = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#38bdf8'];
 const ALLOWED_EMAILS = ["degraff.tim@gmail.com", "mariahfrye@gmail.com", "watterstj1@gmail.com"]; 
 
 export default function App() {
@@ -796,8 +893,13 @@ export default function App() {
     const ftGross = financials.tiers.find(t => t.id === 'tuitionFT')?.gross || 0;
     const ptGross = financials.tiers.filter(t => t.id !== 'tuitionFT').reduce((s, t) => s + t.gross, 0);
     
-    const ftNet = financials.netTuition * (ftGross / totalGross);
-    const ptNet = financials.netTuition * (ptGross / totalGross);
+    // Outside funding stays inside net tuition. When it is positive, the pie shows
+    // it as its own slice and prorates only the family-paid remainder across
+    // full-time and part-time, so the slices still add up to net tuition.
+    const outside = Math.max(0, financials.outsideFundingTotal || 0);
+    const familyNet = financials.netTuition - outside;
+    const ftNet = familyNet * (ftGross / totalGross);
+    const ptNet = familyNet * (ptGross / totalGross);
 
     const afterschool = financials.processedRevenue.find(i => i.id === 'r_afterschool')?.finalValue || 0;
     const grants = financials.processedRevenue.filter(i => i.id.startsWith('r_state') || i.id.startsWith('r_local') || i.id.startsWith('r_oia')).reduce((s, i) => s + i.finalValue, 0);
@@ -806,6 +908,7 @@ export default function App() {
     const data = [
       { name: "Full-Time Tuition", value: ftNet },
       { name: "Part-Time Tuition", value: ptNet },
+      { name: "Outside Funding", value: outside },
       { name: "Grants & State", value: grants },
       { name: "Afterschool", value: afterschool },
       { name: "Other", value: other }
@@ -972,7 +1075,7 @@ export default function App() {
                     <div key={d.id} className="p-4 bg-slate-950/50 rounded-2xl border border-slate-800 shadow-lg">
                       <div className="flex justify-between items-end mb-3 pb-2 border-b border-slate-800/50">
                           <div className="text-[10px] font-bold uppercase text-amber-500 tracking-[0.15em]">{d.label}</div>
-                          <div className="text-sm font-bold text-rose-500">-${Math.round(d.totalDiscountValue || 0).toLocaleString()}</div>
+                          <div className="text-sm font-bold text-rose-500">{formatAsDiscount(d.totalDiscountValue || 0)}</div>
                       </div>
 
                       <div className="grid grid-cols-12 gap-2 mb-2 px-1">
@@ -1048,13 +1151,55 @@ export default function App() {
                             );
                         })}
                       </div>
+
+                      <div className="mt-2 pt-2 border-t border-slate-800/50 flex items-center justify-between gap-3">
+                          <label className="text-[9px] font-bold text-slate-400 leading-snug" htmlFor={`adhoc-${d.id}`}>
+                              Ad hoc adjustment ($/yr, use negative to reduce)
+                          </label>
+                          <AnnualDollarInput
+                              id={`adhoc-${d.id}`}
+                              ariaLabel={`${d.label} ad hoc adjustment dollars per year`}
+                              value={d.adHocAnnual ?? 0}
+                              onChange={(val) => {
+                                  setState(s => ({
+                                      ...s,
+                                      discounts: {
+                                          ...s.discounts,
+                                          [d.id]: {
+                                              ...s.discounts[d.id],
+                                              adHocAnnual: val
+                                          }
+                                      }
+                                  }));
+                              }}
+                          />
+                      </div>
                     </div>
                   ))}
+
+                  <div className="p-4 bg-slate-950/50 rounded-2xl border border-slate-800 shadow-lg">
+                      <div className="flex justify-between items-end mb-2 pb-2 border-b border-slate-800/50">
+                          <div>
+                              <div className="text-[10px] font-bold uppercase text-amber-500 tracking-[0.15em]">Other Discounts</div>
+                              <p className="text-[9px] text-slate-500 mt-1">This can be referrals or ad hoc discounts.</p>
+                          </div>
+                          <div className="text-sm font-bold text-rose-500">{formatAsDiscount(financials.otherDiscountAnnual || 0)}</div>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 mt-3">
+                          <label className="text-[9px] font-bold text-slate-400" htmlFor="other-discount-annual">Annual amount ($/yr)</label>
+                          <AnnualDollarInput
+                              id="other-discount-annual"
+                              ariaLabel="Other discounts annual amount"
+                              value={state.otherDiscountAnnual ?? 0}
+                              onChange={(val) => setState(s => ({ ...s, otherDiscountAnnual: val }))}
+                          />
+                      </div>
+                  </div>
                 </div>
 
                 <div className="mt-6 pt-4 border-t border-slate-800 flex justify-between items-center">
                   <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Total Savings</span>
-                  <span className="text-xl font-bold text-rose-500">-${Math.round(financials.totalDiscounts).toLocaleString()}</span>
+                  <span className="text-xl font-bold text-rose-500">{formatAsDiscount(financials.totalDiscounts)}</span>
                 </div>
               </section>
             </div>
@@ -1092,6 +1237,45 @@ export default function App() {
               </div>
             </div>
           </div>
+
+          <section className="bg-slate-900/40 border border-slate-800/60 rounded-3xl p-5 md:p-6 shadow-xl">
+            <h3 className="text-lg font-bold text-white uppercase tracking-tighter mb-1 flex items-center">
+              <span className="w-1.5 h-6 bg-sky-500 mr-4 rounded-full"></span>Outside Funding
+            </h3>
+            <p className="text-[10px] text-slate-500 mb-4 ml-5 max-w-3xl">
+              Annual amounts. Tuition revenue paid by outside sources rather than families. Included in Net Tuition; it does not reduce total revenue. Family-paid tuition is Net Tuition minus this subtotal.
+            </p>
+            <div className="space-y-2 max-w-xl">
+              {([
+                { key: 'oia' as const, label: 'OIA' },
+                { key: 'cdc' as const, label: 'CDC' },
+                { key: 'other' as const, label: 'Other' },
+              ]).map((row) => (
+                <div key={row.key} className="flex items-center justify-between gap-3 bg-slate-950/50 rounded-xl border border-slate-800 px-3 py-2">
+                  <label className="text-[10px] font-bold uppercase text-slate-300 tracking-widest" htmlFor={`outside-${row.key}`}>{row.label} ($/yr)</label>
+                  <AnnualDollarInput
+                    id={`outside-${row.key}`}
+                    ariaLabel={`${row.label} outside funding dollars per year`}
+                    value={state.outsideFunding?.[row.key] ?? 0}
+                    onChange={(val) => setState(s => ({
+                      ...s,
+                      outsideFunding: { ...s.outsideFunding, [row.key]: val }
+                    }))}
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 pt-4 border-t border-slate-800 max-w-xl space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Subtotal</span>
+                <span className="text-xl font-bold text-sky-400">{formatDollars(financials.outsideFundingTotal)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Family-paid tuition</span>
+                <span className="text-sm font-bold text-amber-500">{formatDollars(financials.familyPaidTuition)}</span>
+              </div>
+            </div>
+          </section>
         </div>
 
         {/* FSAS Section */}
